@@ -21,6 +21,13 @@
 - 🛟 **Overlay no longer blanks on reload** — when OBS refreshes the browser source (scene change, cache clear, GPU recovery), the overlay now replays the last live slide from storage on load instead of going blank until the next manual push
 - 🚫 **Empty title bar hidden** — announcements and blank slides no longer render a floating styled strip when there's no reference/title
 
+### Packaging
+- 📦 **Three release artifacts** — the release scripts now build:
+  - `hymnflow-vX-lite.zip` — plugin + default KJV (`en_kjv.json`) + default hymnal (`nnbh.json`); ~1.6 MB
+  - `hymnflow-vX-full.zip` — plugin + all Bibles + all hymn collections
+  - `hymnflow-vX-data.zip` — importable Bibles + hymn collections only, to drop into an existing install's `data/` folder
+- 🧹 **Removed vestigial `bible-kjv.js` hard-load** — the dock loaded a 4.5 MB `window.HymnFlowBible` global that the lookup engine never consumed; KJV now ships as the importable `en_kjv.json`, trimming the dock's startup load
+
 ### Technical
 - 🧱 **Versioned overlay payload (`v: 2`)** with additive scripture fields (`scriptureMode`, `reference`, `translation`); older overlays ignore them and newer overlays gracefully fall back to plain-text rendering for pre-v2 payloads
 - ♻️ **Single text-slide writer** (`sendOverlayTextSlide`) — scripture, announcements, and plain text slides now share one writer; announcements/plain text are explicitly flagged non-scripture

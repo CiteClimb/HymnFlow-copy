@@ -81,6 +81,45 @@ body {
   background: rgba(0, 0, 0, 0.7);
 }
 
+/* Hide the title bar (and its background) when it carries no text, so
+   announcements / blank slides don't leave a floating styled strip. */
+.title-bar.empty,
+.overlay.scripture .title-bar.empty {
+  display: none;
+}
+
+/* ── Scripture mode ──────────────────────────────────────────────────────
+   Distinct prose presentation: a reference + translation header with a gold
+   accent, and italic serif body text, set apart from centered hymn lyrics. */
+.overlay.scripture .title-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #d4af37;
+  border-bottom: 2px solid rgba(212, 175, 55, 0.6);
+}
+.overlay.scripture .scripture-icon {
+  font-size: 16px;
+  -webkit-text-fill-color: initial;
+}
+.overlay.scripture .translation-badge {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #121212;
+  background: #d4af37;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+.overlay.scripture .content {
+  line-height: 1.6;
+}
+
 .content {
   padding: 30px 40px;
   border-radius: 0 0 12px 12px;

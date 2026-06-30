@@ -531,6 +531,63 @@
     return (currentHymn.verses[currentVerse] || '').split('\n');
   }
 
+  function previewHexToRgba(hex, alpha) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex || '')) return `rgba(0,0,0,${alpha})`;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  // Applies a scaled-down version of the live overlay look to the dock preview
+  // box, so the operator previews a faithful render rather than raw text.
+  function applyPreviewStyles({ scripture = false } = {}) {
+    if (!previewEl) return;
+    const s = settings;
+    previewEl.style.fontSize = Math.max(13, Math.min(34, Math.round((s.fontSize || 48) * 0.45))) + 'px';
+    previewEl.style.color = s.textColor || '#ffffff';
+    previewEl.style.textAlign = 'center';
+    if (scripture) {
+      previewEl.style.fontFamily = "'Georgia', 'Times New Roman', serif";
+      previewEl.style.fontStyle = 'italic';
+      previewEl.style.fontWeight = '400';
+    } else {
+      previewEl.style.fontFamily = s.fontFamily || 'inherit';
+      previewEl.style.fontStyle = s.italic ? 'italic' : 'normal';
+      previewEl.style.fontWeight = s.bold ? '700' : '400';
+    }
+    const opacity = typeof s.bgOpacity === 'number' ? s.bgOpacity / 100 : 0.8;
+    if (s.bgType === 'solid') {
+      previewEl.style.background = previewHexToRgba(s.bgColorA, opacity);
+    } else if (s.bgType === 'gradient') {
+      previewEl.style.background = `linear-gradient(135deg, ${previewHexToRgba(s.bgColorA, opacity)}, ${previewHexToRgba(s.bgColorB, opacity)})`;
+    } else {
+      previewEl.style.background = 'var(--bg)'; // transparent → neutral dock backdrop
+    }
+  }
+
+  function expandPreview() {
+    const toggle = document.getElementById('previewToggle');
+    const body = document.getElementById('previewBody');
+    if (toggle && body && toggle.getAttribute('aria-expanded') === 'false') {
+      toggle.setAttribute('aria-expanded', 'true');
+      body.hidden = false;
+    }
+  }
+
+  // Renders a faithful scripture preview (reference + translation badge + serif
+  // prose) and auto-expands the preview panel.
+  function previewScripture(rawRef, text) {
+    if (!previewEl) return;
+    const { reference, translation } = splitReferenceTranslation(rawRef);
+    applyPreviewStyles({ scripture: true });
+    const head = (reference || translation)
+      ? `<div class="preview-scripture-head">📖 ${escapeHtml(reference)}${translation ? ` <span class="preview-translation-badge">${escapeHtml(translation)}</span>` : ''}</div>`
+      : '';
+    previewEl.innerHTML = `${head}<div class="preview-scripture-body">${escapeHtml(text)}</div>`;
+    expandPreview();
+  }
+
   function updatePreview() {
     if (!currentHymn) {
       if (window.HymnFlowI18n) {
@@ -547,7 +604,8 @@
 
     const lines = getCurrentLines();
     const windowed = lines.slice(currentLineOffset, currentLineOffset + settings.linesPerPage);
-    previewEl.textContent = windowed.join('\n');
+    applyPreviewStyles({ scripture: false });
+    previewEl.textContent = windowed.join('\n'); // textContent also clears any prior scripture markup
 
     const isLastVerse = currentVerse === currentHymn.verses.length - 1;
     const i18n = window.HymnFlowI18n;
@@ -608,6 +666,7 @@
 
       const payload = {
         type: 'show',
+        v: 2,
         hymnId: currentHymn.id,
         title: currentHymn.title,
         author: currentHymn.author,
@@ -770,18 +829,8 @@
     const input = document.getElementById('textSlideInput');
     const text = input ? input.value.trim() : '';
     if (!text) return;
-    try {
-      const payload = {
-        type: 'textslide',
-        lines: text.split('\n'),
-        settings: getSettingsSnapshot(),
-        timestamp: Date.now()
-      };
-      localStorage.setItem(storageKeys.textslide, JSON.stringify(payload));
-      if (statusEl) statusEl.textContent = window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('textSlide.sent') : 'Text slide sent';
-    } catch (err) {
-      console.error('[Text Slide Error]', err);
-    }
+    sendOverlayTextSlide(text, { scripture: false });
+    if (statusEl) statusEl.textContent = window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('textSlide.sent') : 'Text slide sent';
   }
 
   function clearTextSlide() {
@@ -805,23 +854,77 @@
     } catch (err) {}
   }
 
-  function sendScriptureToOverlay(reference, text) {
+  // Splits a reference like "John 3:16 (KJV)" into { reference, translation }.
+  // Falls back to the active translation when the string has no "(...)" suffix.
+  function splitReferenceTranslation(ref) {
+    const m = (ref || '').match(/^(.*\S)\s*\(([^)]+)\)\s*$/);
+    if (m) return { reference: m[1].trim(), translation: m[2].trim() };
+    return {
+      reference: (ref || '').trim(),
+      translation: window.HymnFlowBibleLookup?.getActiveTranslation?.() || ''
+    };
+  }
+
+  // Single writer for the text-slide channel. scriptureMode/reference/translation
+  // are additive v2 fields; older overlays ignore them and render plain text.
+  function sendOverlayTextSlide(text, { reference = '', translation = '', scripture = false } = {}) {
     try {
       const payload = {
         type: 'textslide',
+        v: 2,
         title: reference || '',
-        lines: text.split('\n'),
+        reference: scripture ? reference : '',
+        translation: scripture ? translation : '',
+        scriptureMode: !!scripture,
+        lines: String(text).split('\n'),
         settings: getSettingsSnapshot(),
         timestamp: Date.now()
       };
       localStorage.setItem(storageKeys.textslide, JSON.stringify(payload));
     } catch (err) {
-      console.error('[Scripture Overlay Error]', err);
+      console.error('[Overlay TextSlide Error]', err);
     }
   }
 
+  function sendScriptureToOverlay(rawRef, text) {
+    const { reference, translation } = splitReferenceTranslation(rawRef);
+    sendOverlayTextSlide(text, { reference, translation, scripture: true });
+  }
+
+  // Approx. characters that read comfortably on one slide before the overlay
+  // would have to shrink text toward illegibility. Larger fonts fit less, so
+  // we scale the budget down as font size grows.
+  function slideCharBudget() {
+    const fs = settings.fontSize || 48;
+    // ~520 chars at 48px, scaling inversely with font size; clamped to a sane range.
+    return Math.max(180, Math.min(900, Math.round(520 * (48 / fs))));
+  }
+
+  // Splits a single over-long passage into multiple slides at word boundaries
+  // so long verses paginate instead of being shrunk to an unreadable size.
+  function paginateLongChunk(chunk, budget) {
+    if (chunk.length <= budget) return [chunk];
+    const words = chunk.split(/\s+/);
+    const pages = [];
+    let line = '';
+    for (const w of words) {
+      if (line && (line.length + 1 + w.length) > budget) {
+        pages.push(line);
+        line = w;
+      } else {
+        line = line ? `${line} ${w}` : w;
+      }
+    }
+    if (line) pages.push(line);
+    return pages;
+  }
+
+  // First honours operator-inserted blank lines, then auto-paginates any chunk
+  // that is still too long for one readable slide.
   function parseScriptureChunks(text) {
-    return text.split(/\n[ \t]*\n/).map(s => s.trim()).filter(Boolean);
+    const blocks = text.split(/\n[ \t]*\n/).map(s => s.trim()).filter(Boolean);
+    const budget = slideCharBudget();
+    return blocks.flatMap(b => paginateLongChunk(b, budget));
   }
 
   function updateQsControls() {
@@ -849,6 +952,10 @@
     if (result.found) {
       if (refInput) refInput.value = result.reference;
       if (textArea) textArea.value = result.text;
+      // Confidence preview: show a faithful render of the first page before the
+      // operator pushes it live (also fires when activating a planned scripture item).
+      const firstPage = parseScriptureChunks(result.text)[0] || result.text;
+      previewScripture(result.reference, firstPage);
       if (statusEl) statusEl.textContent = result.verseCount > 1
         ? `Found ${result.verseCount} verses — press Display, then use ← → to step through`
         : `Found: ${result.reference} — press Display to send to overlay`;
@@ -866,6 +973,7 @@
     if (!qsChunks.length) return;
     qsChunkIdx = 0;
     sendScriptureToOverlay(ref, qsChunks[0]);
+    previewScripture(ref, qsChunks[0]);
     updateQsControls();
     if (statusEl) statusEl.textContent = ref
       ? (window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('quickScripture.status', { ref }) : `Scripture: ${ref}`)
@@ -877,6 +985,7 @@
     qsChunkIdx++;
     const ref = (document.getElementById('qsRef')?.value || '').trim();
     sendScriptureToOverlay(ref, qsChunks[qsChunkIdx]);
+    previewScripture(ref, qsChunks[qsChunkIdx]);
     updateQsControls();
   }
 
@@ -885,6 +994,7 @@
     qsChunkIdx--;
     const ref = (document.getElementById('qsRef')?.value || '').trim();
     sendScriptureToOverlay(ref, qsChunks[qsChunkIdx]);
+    previewScripture(ref, qsChunks[qsChunkIdx]);
     updateQsControls();
   }
 
@@ -1484,7 +1594,7 @@
       if (qsRefEl) qsRefEl.value = item.label || '';
       qsLookup();
     } else if (item.type === 'announce') {
-      sendScriptureToOverlay('', item.text || item.label || '');
+      sendOverlayTextSlide(item.text || item.label || '', { scripture: false });
       statusEl.textContent = item.label || 'Announcement displayed';
     } else if (item.type === 'divider') {
       _clearTextSlideOnly();

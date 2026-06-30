@@ -78,9 +78,17 @@
   // Books that have only one chapter; bare "Jude 4" means verse 4, not chapter 4.
   const SINGLE_CHAPTER_BOOKS = new Set(['OBA', 'PHM', '2JN', '3JN', 'JUD']);
 
+  // Normalises a book name for alias lookup: lowercase, strip accents/diacritics
+  // (so "Génesis" → "genesis", "Éphésiens" → "ephesiens"), drop spaces and dots.
+  function normKey(raw) {
+    return raw
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[\s.]/g, '');
+  }
+
   function resolveBook(raw) {
-    const key = raw.toLowerCase().replace(/[\s.]/g, '');
-    return ALIASES[key] || null;
+    return ALIASES[normKey(raw)] || null;
   }
 
   // Parses references like:
@@ -157,6 +165,53 @@
     'Titus','Philemon','Hebrews','James','1 Peter','2 Peter',
     '1 John','2 John','3 John','Jude','Revelation',
   ];
+
+  // ── Localized book-name aliases ────────────────────────────────────────
+  // Lets non-English operators type references in their language (e.g. "Juan 3:16",
+  // "Jean 3:16", "João 3:16"). Names are listed in canonical BOOK_CODES order.
+  // Accents are stripped at merge time, so cognates resolve even if typed plainly.
+  // English (ALIASES above) always remains available as a fallback.
+  // Extend by adding another language array; partial arrays are fine.
+  const LOCALE_BOOK_NAMES = {
+    es: ['Génesis','Éxodo','Levítico','Números','Deuteronomio','Josué','Jueces','Rut',
+      '1 Samuel','2 Samuel','1 Reyes','2 Reyes','1 Crónicas','2 Crónicas','Esdras','Nehemías',
+      'Ester','Job','Salmos','Proverbios','Eclesiastés','Cantares','Isaías','Jeremías',
+      'Lamentaciones','Ezequiel','Daniel','Oseas','Joel','Amós','Abdías','Jonás',
+      'Miqueas','Nahúm','Habacuc','Sofonías','Hageo','Zacarías','Malaquías',
+      'Mateo','Marcos','Lucas','Juan','Hechos','Romanos','1 Corintios','2 Corintios',
+      'Gálatas','Efesios','Filipenses','Colosenses','1 Tesalonicenses','2 Tesalonicenses',
+      '1 Timoteo','2 Timoteo','Tito','Filemón','Hebreos','Santiago','1 Pedro','2 Pedro',
+      '1 Juan','2 Juan','3 Juan','Judas','Apocalipsis'],
+    fr: ['Genèse','Exode','Lévitique','Nombres','Deutéronome','Josué','Juges','Ruth',
+      '1 Samuel','2 Samuel','1 Rois','2 Rois','1 Chroniques','2 Chroniques','Esdras','Néhémie',
+      'Esther','Job','Psaumes','Proverbes','Ecclésiaste','Cantique des Cantiques','Ésaïe','Jérémie',
+      'Lamentations','Ézéchiel','Daniel','Osée','Joël','Amos','Abdias','Jonas',
+      'Michée','Nahum','Habacuc','Sophonie','Aggée','Zacharie','Malachie',
+      'Matthieu','Marc','Luc','Jean','Actes','Romains','1 Corinthiens','2 Corinthiens',
+      'Galates','Éphésiens','Philippiens','Colossiens','1 Thessaloniciens','2 Thessaloniciens',
+      '1 Timothée','2 Timothée','Tite','Philémon','Hébreux','Jacques','1 Pierre','2 Pierre',
+      '1 Jean','2 Jean','3 Jean','Jude','Apocalypse'],
+    pt: ['Gênesis','Êxodo','Levítico','Números','Deuteronômio','Josué','Juízes','Rute',
+      '1 Samuel','2 Samuel','1 Reis','2 Reis','1 Crônicas','2 Crônicas','Esdras','Neemias',
+      'Ester','Jó','Salmos','Provérbios','Eclesiastes','Cânticos','Isaías','Jeremias',
+      'Lamentações','Ezequiel','Daniel','Oseias','Joel','Amós','Obadias','Jonas',
+      'Miqueias','Naum','Habacuque','Sofonias','Ageu','Zacarias','Malaquias',
+      'Mateus','Marcos','Lucas','João','Atos','Romanos','1 Coríntios','2 Coríntios',
+      'Gálatas','Efésios','Filipenses','Colossenses','1 Tessalonicenses','2 Tessalonicenses',
+      '1 Timóteo','2 Timóteo','Tito','Filemom','Hebreus','Tiago','1 Pedro','2 Pedro',
+      '1 João','2 João','3 João','Judas','Apocalipse'],
+  };
+
+  // Merge localized names into ALIASES. We never overwrite an existing English
+  // mapping, so English semantics are preserved and cognates stay consistent.
+  Object.values(LOCALE_BOOK_NAMES).forEach(names => {
+    names.forEach((name, i) => {
+      const code = BOOK_CODES[i];
+      if (!code) return;
+      const key = normKey(name);
+      if (key && !(key in ALIASES)) ALIASES[key] = code;
+    });
+  });
 
   // Converts the raw source array format (thiagobodruk / aruljohn — 0-indexed)
   // into the HymnFlow 1-indexed object format used by lookup().

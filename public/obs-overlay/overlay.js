@@ -16,10 +16,26 @@
     "'Segoe UI', sans-serif",
     "'Roboto', sans-serif",
     "'Georgia', serif",
+    "'Times New Roman', serif",
     "'Montserrat', sans-serif",
   ]);
   function safeFont(val) {
     return FONT_ALLOWLIST.has(val) ? val : 'Inter, sans-serif';
+  }
+
+  // Serif stack for scripture prose — system fonts so it works offline (file://).
+  const SCRIPTURE_FONT = "'Georgia', 'Times New Roman', serif";
+
+  function escapeHtml(text) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return String(text == null ? '' : text).replace(/[&<>"']/g, (c) => map[c]);
+  }
+
+  // Hides the title bar entirely when it has no content, so empty/announce
+  // slides don't render a floating styled strip.
+  function syncTitleBarVisibility() {
+    const hasContent = titleBarEl.textContent.trim().length > 0;
+    titleBarEl.classList.toggle('empty', !hasContent);
   }
 
   function applyStyles(settings) {
@@ -123,13 +139,15 @@
         : '';
     
     applyStyles(settings);
+    overlayEl.classList.remove('scripture');
 
     if (data.isChorus) {
       titleBarEl.textContent = `${hymnRef}${title} • Chorus`;
     } else {
       titleBarEl.textContent = `${hymnRef}${title} • Verse ${verseNumber}/${totalVerses}`;
     }
-    
+    syncTitleBarVisibility();
+
     // Ensure lines is an array and join properly
     const displayText = Array.isArray(lines) ? lines.join('\n') : String(lines);
     contentEl.textContent = displayText;
@@ -164,8 +182,30 @@
   function showTextSlide(data) {
     const { lines, settings } = data;
     applyStyles(settings);
-    titleBarEl.textContent = data.title || '';
-    contentEl.textContent = Array.isArray(lines) ? lines.join('\n') : String(lines);
+    const text = Array.isArray(lines) ? lines.join('\n') : String(lines);
+
+    // scriptureMode is an additive v2 field. Older docks omit it, in which case
+    // we fall back to the plain text-slide rendering (graceful degradation).
+    if (data.scriptureMode) {
+      overlayEl.classList.add('scripture');
+      const reference = escapeHtml(data.reference || data.title || '');
+      const translation = escapeHtml(data.translation || '');
+      const badge = translation
+        ? `<span class="translation-badge">${translation}</span>`
+        : '';
+      titleBarEl.innerHTML = reference || translation
+        ? `<span class="scripture-icon">📖</span><span class="scripture-reference">${reference}</span>${badge}`
+        : '';
+      // Serif prose look — distinct from hymn lyrics. Overrides applyStyles' font.
+      contentEl.style.fontFamily = SCRIPTURE_FONT;
+      contentEl.style.fontStyle = 'italic';
+    } else {
+      overlayEl.classList.remove('scripture');
+      titleBarEl.textContent = data.title || '';
+    }
+    syncTitleBarVisibility();
+
+    contentEl.textContent = text;
     fitTextToOverlay();
     overlayEl.classList.remove('hidden', 'fade-out', 'slide-out', 'fade-in', 'slide-in');
     overlayEl.classList.add('visible');
@@ -203,6 +243,30 @@
     }
   });
 
+  // Re-render the last live slide after a reload. OBS refreshes browser sources
+  // on scene changes, cache clears, and GPU recovery; without this the screen
+  // goes blank mid-service until the operator pushes again. We replay whichever
+  // of the two command channels holds the most recent command.
+  function replayLastState() {
+    let latest = null;
+    for (const key of [STORAGE_KEY, TEXTSLIDE_KEY]) {
+      try {
+        const cmd = JSON.parse(localStorage.getItem(key) || 'null');
+        if (cmd && (!latest || (cmd.timestamp || 0) > (latest.timestamp || 0))) {
+          latest = cmd;
+        }
+      } catch (err) { /* ignore malformed entry */ }
+    }
+    if (!latest || latest.type === 'hide') return;
+    try {
+      if (latest.type === 'show') show(latest);
+      else if (latest.type === 'textslide') showTextSlide(latest);
+    } catch (err) {
+      console.error('[Overlay Replay Error]', err);
+    }
+  }
+
   // Initial state
   overlayEl.classList.add('hidden');
+  replayLastState();
 })();

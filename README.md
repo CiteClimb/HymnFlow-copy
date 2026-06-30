@@ -1,6 +1,6 @@
 # 🎵 HymnFlow — OBS Studio Hymn & Scripture Display Plugin
 
-**v2.5.0** · [Changelog](doc/CHANGELOG.md) · [Setup Guide](doc/SETUP.md) · [Full Docs](doc/OBS_DOCK_README.md)
+**v2.6.0** · [Changelog](doc/CHANGELOG.md) · [Setup Guide](doc/SETUP.md) · [Full Docs](doc/OBS_DOCK_README.md)
 
 HymnFlow is a browser-based OBS Studio plugin for displaying hymns and scripture during worship services. It runs entirely in the browser — no server, no Node.js, no installation. A custom dock controls the presentation; a browser source overlays text on your stream.
 

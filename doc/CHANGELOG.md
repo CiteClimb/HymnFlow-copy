@@ -1,3 +1,32 @@
+## [2.6.0] - 2026-06-30
+
+### Scripture Projection Overhaul & Overlay Reliability
+
+**Focus**: Scripture gets its own visual identity (serif prose + reference/translation badge), the overlay survives OBS source reloads, long passages auto-paginate, the dock preview becomes true WYSIWYG, and the reference parser learns Spanish/French/Portuguese.
+
+### Added
+
+#### Scripture Presentation
+- 📖 **Distinct scripture overlay** — scripture now renders with an italic serif body (Georgia/Times, system fonts so it works offline) and a gold reference header with a styled **translation badge** (e.g. `ROMANS 8:28 · KJV`), set apart from centered hymn lyrics
+- 🎯 **WYSIWYG dock preview** — the Live-tab preview now mirrors the live overlay look (font, color, weight, background, scaled) instead of plain text, and renders scripture with the same reference header + badge
+- 👁️ **Confidence preview on lookup** — looking up a reference (including activating a planned scripture item) shows a faithful styled preview *before* you push it live
+- 📄 **Scripture auto-pagination** — over-long passages split into readable, fit-sized slides at word boundaries (budget scales with font size) instead of shrinking text toward illegibility; operator blank-line splits are still honored first
+
+#### Internationalization
+- 🌍 **Localized reference parsing** — operators can type references in Spanish, French, and Portuguese (`Juan 3:16`, `Jean 3:16`, `João 3:16`, `1 Corintios 13:4`, `Éphésiens 2:8`); accents are stripped automatically and English always remains available as a fallback. Extending to more languages is a one-array addition.
+- 🔤 **Times New Roman** added as an offline serif font option alongside Georgia
+
+### Fixed
+
+- 🛟 **Overlay no longer blanks on reload** — when OBS refreshes the browser source (scene change, cache clear, GPU recovery), the overlay now replays the last live slide from storage on load instead of going blank until the next manual push
+- 🚫 **Empty title bar hidden** — announcements and blank slides no longer render a floating styled strip when there's no reference/title
+
+### Technical
+- 🧱 **Versioned overlay payload (`v: 2`)** with additive scripture fields (`scriptureMode`, `reference`, `translation`); older overlays ignore them and newer overlays gracefully fall back to plain-text rendering for pre-v2 payloads
+- ♻️ **Single text-slide writer** (`sendOverlayTextSlide`) — scripture, announcements, and plain text slides now share one writer; announcements/plain text are explicitly flagged non-scripture
+
+---
+
 ## [2.5.0] - 2026-06-19
 
 ### Service Planning Overhaul & Global OBS Hotkeys

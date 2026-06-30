@@ -922,6 +922,32 @@ body {
   color: var(--text);
 }
 
+/* Scripture preview header — mirrors the overlay's gold reference badge.
+   Not italicised, even though the verse body is. */
+.preview-scripture-head {
+  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #d4af37;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.5);
+}
+.preview-translation-badge {
+  font-style: normal;
+  color: #121212;
+  background: #d4af37;
+  border-radius: 4px;
+  padding: 1px 6px;
+  margin-left: 4px;
+}
+.preview-scripture-body {
+  white-space: pre-wrap;
+}
+
 /* ========================================
    Styles Form
    ======================================== */

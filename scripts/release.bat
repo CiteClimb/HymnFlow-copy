@@ -33,8 +33,8 @@ REM ===== 1. LITE bundle: plugin + KJV + nnbh =====
 echo Building lite bundle...
 set LITE=hymnflow-v!VERSION!-lite
 call :stage_plugin "!LITE!"
-copy public\data\en_kjv.json "!LITE!\data\" > nul
-copy hymn-bundle\nnbh.json   "!LITE!\data\" > nul
+copy public\data\bible-kjv.js "!LITE!\data\" > nul
+copy hymn-bundle\nnbh.json    "!LITE!\data\" > nul
 call :make_zip "!LITE!"
 
 REM ===== 2. FULL bundle: plugin + all Bibles + all hymn collections =====
@@ -94,7 +94,7 @@ goto :eof
 REM ---- Copy all importable Bibles + hymn collections into %1 ----
 :copy_data
 set DD=%~1
-copy public\data\en_kjv.json  "!DD!\" > nul
+copy public\data\bible-kjv.js "!DD!\" > nul
 copy public\data\en_bbe.json  "!DD!\" > nul
 copy public\data\bible-yor.js "!DD!\" > nul
 copy hymn-bundle\cac_ghb.json "!DD!\" > nul

@@ -25,7 +25,7 @@ fi
 # ── Importable data sources ────────────────────────────────────────────────
 # Bibles live in public/data (large files, git-ignored — generate or import).
 # Hymn collections live in hymn-bundle/.
-BIBLES="public/data/en_kjv.json public/data/en_bbe.json public/data/bible-yor.js"
+BIBLES="public/data/bible-kjv.js public/data/en_bbe.json public/data/bible-yor.js"
 HYMNS="hymn-bundle/cac_ghb.json hymn-bundle/cac_yhb.json hymn-bundle/fws.json \
        hymn-bundle/nnbh.json hymn-bundle/umh.json hymn-bundle/ybh.json hymn-bundle/metadata.json"
 
@@ -61,8 +61,8 @@ make_zip() { # make_zip <dir> <zipfile>
 echo "📦 Building lite bundle (KJV + nnbh)..."
 LITE="hymnflow-v$VERSION-lite"
 stage_plugin "$LITE"
-cp public/data/en_kjv.json "$LITE/data/"
-cp hymn-bundle/nnbh.json   "$LITE/data/"
+cp public/data/bible-kjv.js "$LITE/data/"
+cp hymn-bundle/nnbh.json    "$LITE/data/"
 make_zip "$LITE" "hymnflow-v$VERSION-lite.zip"
 
 echo "📦 Building full bundle (all Bibles + all hymn collections)..."

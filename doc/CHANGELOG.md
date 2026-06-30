@@ -12,6 +12,9 @@
 - 👁️ **Confidence preview on lookup** — looking up a reference (including activating a planned scripture item) shows a faithful styled preview *before* you push it live
 - 📄 **Scripture auto-pagination** — over-long passages split into readable, fit-sized slides at word boundaries (budget scales with font size) instead of shrinking text toward illegibility; operator blank-line splits are still honored first
 
+#### First-run experience
+- 🚀 **Plug-and-play KJV** — on first launch with an empty library, the dock auto-seeds the bundled KJV into IndexedDB so scripture lookup works out of the box, no manual import. Offline-safe (loads via dynamic `<script>` injection since `file://` blocks `fetch()`) and lazy (the ~4.5 MB file loads only on that first run; subsequent loads restore from IndexedDB). A deliberately-emptied library stays empty.
+
 #### Internationalization
 - 🌍 **Localized reference parsing** — operators can type references in Spanish, French, and Portuguese (`Juan 3:16`, `Jean 3:16`, `João 3:16`, `1 Corintios 13:4`, `Éphésiens 2:8`); accents are stripped automatically and English always remains available as a fallback. Extending to more languages is a one-array addition.
 - 🔤 **Times New Roman** added as an offline serif font option alongside Georgia
@@ -23,10 +26,10 @@
 
 ### Packaging
 - 📦 **Three release artifacts** — the release scripts now build:
-  - `hymnflow-vX-lite.zip` — plugin + default KJV (`en_kjv.json`) + default hymnal (`nnbh.json`); ~1.6 MB
+  - `hymnflow-vX-lite.zip` — plugin + default KJV (`bible-kjv.js`) + default hymnal (`nnbh.json`); ~1.6 MB
   - `hymnflow-vX-full.zip` — plugin + all Bibles + all hymn collections
   - `hymnflow-vX-data.zip` — importable Bibles + hymn collections only, to drop into an existing install's `data/` folder
-- 🧹 **Removed vestigial `bible-kjv.js` hard-load** — the dock loaded a 4.5 MB `window.HymnFlowBible` global that the lookup engine never consumed; KJV now ships as the importable `en_kjv.json`, trimming the dock's startup load
+- 🧹 **Dropped the always-on `bible-kjv.js` `<script>`** — the dock used to load a 4.5 MB `window.HymnFlowBible` global on every open that the lookup engine never consumed. KJV is now loaded only once, on first run, to seed IndexedDB (see *Plug-and-play KJV* above), so normal dock startup no longer pays that cost
 
 ### Technical
 - 🧱 **Versioned overlay payload (`v: 2`)** with additive scripture fields (`scriptureMode`, `reference`, `translation`); older overlays ignore them and newer overlays gracefully fall back to plain-text rendering for pre-v2 payloads

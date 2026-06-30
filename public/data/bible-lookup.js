@@ -435,6 +435,30 @@
       });
     },
 
+    // Imports already-loaded data (a parsed object/array, not a File) under the
+    // given name. Used for first-run auto-seeding from a bundled JS global.
+    // Accepts the raw source array format or the HymnFlow object format.
+    // Returns a Promise resolving to { ok, name, persisted }.
+    importParsed(content, name) {
+      let bibleData;
+      try {
+        bibleData = Array.isArray(content) ? convertRawArray(content) : content;
+      } catch (err) {
+        return Promise.resolve({ ok: false, message: `Seed failed: ${err.message}` });
+      }
+      if (!bibleData || !bibleData.GEN) {
+        return Promise.resolve({ ok: false, message: 'Seed data not in a recognised format' });
+      }
+      window.HymnFlowBibles[name] = bibleData;
+      if (!activeTranslation) activeTranslation = name;
+      return persistOne(name, bibleData).then(persisted => {
+        if (persisted) {
+          try { localStorage.setItem(ACTIVE_KEY, activeTranslation); } catch (e) { /* ignore */ }
+        }
+        return { ok: true, name, persisted };
+      });
+    },
+
     // Removes a translation from memory and storage.
     removeBible(name) {
       if (!window.HymnFlowBibles[name]) return;

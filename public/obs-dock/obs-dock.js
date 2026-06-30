@@ -2181,6 +2181,34 @@
     }
   }
 
+  // First-run convenience: if no Bible is loaded yet, seed the bundled default
+  // (KJV) into IndexedDB by dynamically loading its JS global. file:// blocks
+  // fetch(), so a <script> injection is the only offline-safe way to read it.
+  // Once a seed succeeds we set a flag so a deliberately-emptied library stays
+  // empty; a missing bundle file (e.g. a code-only install) is a silent no-op.
+  function seedDefaultBibleIfEmpty() {
+    return new Promise(resolve => {
+      if (!window.HymnFlowBibleLookup || window.HymnFlowBibleLookup.isLoaded()) return resolve(false);
+      if (localStorage.getItem('hymnflow-bible-seeded')) return resolve(false);
+      const script = document.createElement('script');
+      script.src = '../data/bible-kjv.js?v=2.6.0';
+      script.onload = () => {
+        const seed = window.HymnFlowBible;
+        if (!seed) return resolve(false);
+        window.HymnFlowBibleLookup.importParsed(seed, 'KJV').then(res => {
+          try { delete window.HymnFlowBible; } catch (e) { window.HymnFlowBible = undefined; }
+          if (res && res.ok) {
+            try { localStorage.setItem('hymnflow-bible-seeded', '1'); } catch (e) { /* ignore */ }
+            if (statusEl) statusEl.textContent = 'KJV loaded — ready for scripture lookup';
+          }
+          resolve(!!(res && res.ok));
+        });
+      };
+      script.onerror = () => resolve(false); // no bundled Bible present — fine
+      document.head.appendChild(script);
+    });
+  }
+
   function updateQsTranslationSelect() {
     const sel = document.getElementById('qsTranslation');
     if (!sel || !window.HymnFlowBibleLookup) return;
@@ -2384,11 +2412,13 @@
   if (settings.obsWsEnabled) obsWsConnect();
   loadServices();
   if (window.HymnFlowBibleLookup) {
-    window.HymnFlowBibleLookup.restoreFromStorage().then(() => {
-      updateBibleStatusBadge();
-      renderBibleList();
-      updateQsTranslationSelect();
-    });
+    window.HymnFlowBibleLookup.restoreFromStorage()
+      .then(() => seedDefaultBibleIfEmpty())
+      .then(() => {
+        updateBibleStatusBadge();
+        renderBibleList();
+        updateQsTranslationSelect();
+      });
   }
   buildSearchIndex();
   renderSourceFilters();

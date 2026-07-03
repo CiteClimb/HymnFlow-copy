@@ -7,8 +7,8 @@
   <meta http-equiv="Content-Security-Policy" content="object-src 'none'; base-uri 'none'">
   <title>HymnFlow OBS Dock</title>
   <link rel="stylesheet" href="obs-dock.css">
-  <script src="../i18n/translations.js?v=2.6.0"></script>
-  <script src="../i18n/i18n.js?v=2.6.0"></script>
+  <script src="../i18n/translations.js?v=2.7.0"></script>
+  <script src="../i18n/i18n.js?v=2.7.0"></script>
 </head>
 
 <body>
@@ -372,12 +372,46 @@
         </div>
       </section>
 
+      <!-- Scripture Display (projection style for Bible verses) -->
+      <details class="section collapsible-section" id="scriptureStylePanel">
+        <summary>
+          <h3>Scripture Display</h3>
+        </summary>
+        <div class="styles-form">
+          <label class="form-label">
+            <span>Scripture font</span>
+            <select id="scriptureFontFamily" class="form-select">
+              <option value="serif">Classic Serif (default)</option>
+              <option value="'Georgia', serif">Georgia</option>
+              <option value="'Times New Roman', serif">Times New Roman</option>
+              <option value="Inter, sans-serif">Inter</option>
+              <option value="'Segoe UI', sans-serif">Segoe UI</option>
+              <option value="'Roboto', sans-serif">Roboto</option>
+              <option value="'Montserrat', sans-serif">Montserrat</option>
+              <option value="lyrics">Same as lyrics</option>
+            </select>
+          </label>
+
+          <div class="style-options">
+            <label class="checkbox-label"><input type="checkbox" id="scriptureItalic" checked> <span>Italic text</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="scriptureShowReference" checked> <span>Show reference</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="scriptureShowBadge" checked> <span>Translation badge</span></label>
+            <label class="checkbox-label"><input type="checkbox" id="scriptureCustomSize"> <span>Custom size</span></label>
+          </div>
+
+          <label class="form-label" id="scriptureSizeRow" style="display: none;">
+            <span>Scripture font size</span> <span id="scriptureFontSizeValue">44px</span>
+            <input type="range" id="scriptureFontSize" min="24" max="96" value="44" class="form-slider">
+          </label>
+        </div>
+      </details>
+
       <!-- OBS Connection (obs-websocket + global hotkeys) -->
-      <section class="section">
-        <h3 style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
-          OBS Connection
+      <details class="section collapsible-section" id="obsConnPanel">
+        <summary>
+          <h3>OBS Connection</h3>
           <span id="obsWsBadge" class="obs-ws-badge obs-ws-disconnected" title="Disconnected">●</span>
-        </h3>
+        </summary>
         <div class="styles-form">
           <label class="form-label">
             <span>Host</span>
@@ -404,7 +438,7 @@
             <span style="color: var(--text-muted);">Global hotkeys (any window): load <code>scripts/hymnflow-obs-hotkeys.py</code> in OBS → Tools → Scripts, then bind keys in Settings → Hotkeys.</span>
           </div>
         </div>
-      </section>
+      </details>
 
       <section class="section">
         <h3 data-i18n="settings.title" style="margin-bottom: 12px;">Settings</h3>
@@ -485,11 +519,11 @@
   </div>
 
   <script src="../data/hymns-data.js"></script>
-  <script src="../data/bible-lookup.js?v=2.6.0"></script>
-  <script src="../validation.js?v=2.6.0"></script>
-  <script src="../parsers/txtParser.js?v=2.6.0"></script>
-  <script src="../parsers/jsonParser.js?v=2.6.0"></script>
-  <script src="obs-dock.js?v=2.6.0"></script>
+  <script src="../data/bible-lookup.js?v=2.7.0"></script>
+  <script src="../validation.js?v=2.7.0"></script>
+  <script src="../parsers/txtParser.js?v=2.7.0"></script>
+  <script src="../parsers/jsonParser.js?v=2.7.0"></script>
+  <script src="obs-dock.js?v=2.7.0"></script>
 </body>
 
 </html>

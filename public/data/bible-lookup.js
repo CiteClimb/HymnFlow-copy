@@ -96,40 +96,34 @@
   //   "John 3:16"            → single verse
   //   "John 3 16"            → same (space instead of colon)
   //   "John 3:16-18"         → verse range
+  //   "John 3:16 18"         → same (space instead of dash)
+  //   "John 3 16 18"         → same (all spaces)
   //   "1 Cor 13:4-7"         → numbered-book + range
   //   "1Cor 13:4-7"          → compact numbered-book (no space)
   //   "Song of Solomon 1:1"  → multi-word book name
   //   "Jude 24"              → single-chapter book: treated as Jude 1:24
   function parseRef(refStr) {
-    const s = refStr.trim();
-    // Right-anchored split: book name is everything to the left of the last
-    // space+number group, so multi-word names and compact "1Cor" both resolve.
-    const m = s.match(/^(.*\S)\s+(\d+)(?::(\d+)(?:\s*[-–]\s*(\d+))?)?$/);
+    // Drop a trailing "(KJV)"-style translation tag so references written back
+    // into the search box by a previous lookup still round-trip.
+    const s = refStr.trim().replace(/\s*\([^)]*\)$/, '');
+    // Split book name from the numeric tail. The lazy book group plus a
+    // digits-only tail makes the engine pick the shortest book that leaves a
+    // purely numeric reference, so numbered books ("1 Cor 13 4") and
+    // multi-word names ("Song of Solomon 1 1") both resolve.
+    const m = s.match(/^(.*?\S)\s+(\d[\d\s:–—-]*)$/);
     if (!m) return null;
 
-    let bookPart = m[1];
-    let chapter = parseInt(m[2], 10);
-    let verseStart = m[3] ? parseInt(m[3], 10) : null;
-    let verseEnd   = m[4] ? parseInt(m[4], 10) : verseStart;
-
-    let bookCode = resolveBook(bookPart);
-
-    // Fallback: "Book Chapter Verse" with a space instead of a colon ("Jn 3 16").
-    // Primary matched bookPart="Jn 3", chapter=16 — try splitting one token earlier.
-    if (!bookCode) {
-      const m2 = s.match(/^(.*\S)\s+(\d+)\s+(\d+)$/);
-      if (m2) {
-        const code2 = resolveBook(m2[1]);
-        if (code2) {
-          bookCode   = code2;
-          chapter    = parseInt(m2[2], 10);
-          verseStart = parseInt(m2[3], 10);
-          verseEnd   = verseStart;
-        }
-      }
-    }
-
+    const bookCode = resolveBook(m[1]);
     if (!bookCode) return null;
+
+    // Tail: chapter, optional verse (colon or space), optional range end
+    // (dash or space) — "8:28-30", "8:28 30", "8 28 30", "8:28", "8".
+    const t = m[2].trim().match(/^(\d+)(?:(?:\s*:\s*|\s+)(\d+)(?:(?:\s*[–—-]\s*|\s+)(\d+))?)?$/);
+    if (!t) return null;
+
+    let chapter    = parseInt(t[1], 10);
+    let verseStart = t[2] ? parseInt(t[2], 10) : null;
+    let verseEnd   = t[3] ? parseInt(t[3], 10) : verseStart;
     if (verseStart !== null && verseEnd < verseStart) return null;
 
     // Single-chapter books: "Jude 24" means verse 24, not chapter 24.

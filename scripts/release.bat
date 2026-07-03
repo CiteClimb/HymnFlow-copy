@@ -92,11 +92,19 @@ if exist "doc\RELEASE_NOTES_v!VERSION!.md" copy "doc\RELEASE_NOTES_v!VERSION!.md
 goto :eof
 
 REM ---- Copy all importable Bibles + hymn collections into %1 ----
+REM The bible-en-* set is the accuracy-audited curated six from
+REM scripts/scrape_bible_api.py (see doc/RELEASE_NOTES_v2.7.0.md).
 :copy_data
 set DD=%~1
 copy public\data\bible-kjv.js "!DD!\" > nul
 copy public\data\en_bbe.json  "!DD!\" > nul
 copy public\data\bible-yor.js "!DD!\" > nul
+copy public\data\bible-en-kjv.js  "!DD!\" > nul
+copy public\data\bible-en-rv.js   "!DD!\" > nul
+copy public\data\bible-en-lsv.js  "!DD!\" > nul
+copy public\data\bible-en-gnv.js  "!DD!\" > nul
+copy public\data\bible-en-dra.js  "!DD!\" > nul
+copy public\data\bible-en-ojps.js "!DD!\" > nul
 copy hymn-bundle\cac_ghb.json "!DD!\" > nul
 copy hymn-bundle\cac_yhb.json "!DD!\" > nul
 copy hymn-bundle\fws.json     "!DD!\" > nul

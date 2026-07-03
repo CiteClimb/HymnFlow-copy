@@ -188,17 +188,27 @@
     // we fall back to the plain text-slide rendering (graceful degradation).
     if (data.scriptureMode) {
       overlayEl.classList.add('scripture');
+      // All scripture* settings are additive — absent (older docks) means default.
+      const showRef = settings.scriptureShowReference !== false;
+      const showBadge = settings.scriptureShowBadge !== false;
       const reference = escapeHtml(data.reference || data.title || '');
       const translation = escapeHtml(data.translation || '');
-      const badge = translation
+      const badge = (translation && showBadge)
         ? `<span class="translation-badge">${translation}</span>`
         : '';
-      titleBarEl.innerHTML = reference || translation
+      titleBarEl.innerHTML = showRef && (reference || badge)
         ? `<span class="scripture-icon">📖</span><span class="scripture-reference">${reference}</span>${badge}`
         : '';
-      // Serif prose look — distinct from hymn lyrics. Overrides applyStyles' font.
-      contentEl.style.fontFamily = SCRIPTURE_FONT;
-      contentEl.style.fontStyle = 'italic';
+      // Scripture prose look — distinct from hymn lyrics unless the operator
+      // opted to follow the lyric font. Overrides applyStyles' font.
+      const sf = settings.scriptureFontFamily;
+      contentEl.style.fontFamily = sf === 'lyrics'
+        ? safeFont(settings.fontFamily)
+        : (FONT_ALLOWLIST.has(sf) ? sf : SCRIPTURE_FONT);
+      contentEl.style.fontStyle = settings.scriptureItalic === false ? 'normal' : 'italic';
+      if (settings.scriptureCustomSize && typeof settings.scriptureFontSize === 'number') {
+        contentEl.style.fontSize = Math.max(16, Math.min(120, settings.scriptureFontSize)) + 'px';
+      }
     } else {
       overlayEl.classList.remove('scripture');
       titleBarEl.textContent = data.title || '';

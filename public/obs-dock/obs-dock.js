@@ -56,6 +56,16 @@
     bgOpacity: 80,
     animation: 'fade',
     position: 'bottom',
+    // Scripture display (projection style for Bible verses)
+    scriptureFontFamily: 'serif',   // 'serif' | 'lyrics' | explicit font stack
+    scriptureItalic: true,
+    scriptureShowReference: true,
+    scriptureShowBadge: true,
+    scriptureCustomSize: false,
+    scriptureFontSize: 44,
+    // Collapsible panel states (Style tab)
+    scripturePanelOpen: false,
+    obsPanelOpen: false,
     activeTab: 'library',
     obsWsHost: '127.0.0.1',
     obsWsPort: 4455,
@@ -307,6 +317,9 @@
   // Debounced settings save - prevents thrashing localStorage
   let settingsSaveTimeout = null;
   function saveSettings() {
+    // Invalidate the snapshot cache immediately — callers often re-push the
+    // overlay right after mutating settings, before the debounced write runs.
+    settingsCacheValid = false;
     clearTimeout(settingsSaveTimeout);
     settingsSaveTimeout = setTimeout(() => {
       try {
@@ -539,6 +552,14 @@
     return `rgba(${r},${g},${b},${alpha})`;
   }
 
+  // Resolves the scripture font setting to a concrete CSS font stack.
+  // 'serif' → classic serif default, 'lyrics' → follow the lyric font.
+  function scriptureFontStack(s) {
+    if (s.scriptureFontFamily === 'lyrics') return s.fontFamily || 'inherit';
+    if (s.scriptureFontFamily && s.scriptureFontFamily !== 'serif') return s.scriptureFontFamily;
+    return "'Georgia', 'Times New Roman', serif";
+  }
+
   // Applies a scaled-down version of the live overlay look to the dock preview
   // box, so the operator previews a faithful render rather than raw text.
   function applyPreviewStyles({ scripture = false } = {}) {
@@ -548,9 +569,12 @@
     previewEl.style.color = s.textColor || '#ffffff';
     previewEl.style.textAlign = 'center';
     if (scripture) {
-      previewEl.style.fontFamily = "'Georgia', 'Times New Roman', serif";
-      previewEl.style.fontStyle = 'italic';
+      previewEl.style.fontFamily = scriptureFontStack(s);
+      previewEl.style.fontStyle = s.scriptureItalic === false ? 'normal' : 'italic';
       previewEl.style.fontWeight = '400';
+      if (s.scriptureCustomSize && typeof s.scriptureFontSize === 'number') {
+        previewEl.style.fontSize = Math.max(13, Math.min(34, Math.round(s.scriptureFontSize * 0.45))) + 'px';
+      }
     } else {
       previewEl.style.fontFamily = s.fontFamily || 'inherit';
       previewEl.style.fontStyle = s.italic ? 'italic' : 'normal';
@@ -581,8 +605,11 @@
     if (!previewEl) return;
     const { reference, translation } = splitReferenceTranslation(rawRef);
     applyPreviewStyles({ scripture: true });
-    const head = (reference || translation)
-      ? `<div class="preview-scripture-head">📖 ${escapeHtml(reference)}${translation ? ` <span class="preview-translation-badge">${escapeHtml(translation)}</span>` : ''}</div>`
+    const badge = (translation && settings.scriptureShowBadge !== false)
+      ? ` <span class="preview-translation-badge">${escapeHtml(translation)}</span>`
+      : '';
+    const head = ((reference || badge) && settings.scriptureShowReference !== false)
+      ? `<div class="preview-scripture-head">📖 ${escapeHtml(reference)}${badge}</div>`
       : '';
     previewEl.innerHTML = `${head}<div class="preview-scripture-body">${escapeHtml(text)}</div>`;
     expandPreview();
@@ -950,7 +977,9 @@
 
     const result = window.HymnFlowBibleLookup.lookup(ref);
     if (result.found) {
-      if (refInput) refInput.value = result.reference;
+      // Write back the bare reference (no "(KJV)" suffix) so re-searching or
+      // editing the verse number in place still parses.
+      if (refInput) refInput.value = splitReferenceTranslation(result.reference).reference;
       if (textArea) textArea.value = result.text;
       // Confidence preview: show a faithful render of the first page before the
       // operator pushes it live (also fires when activating a planned scripture item).
@@ -1865,6 +1894,57 @@
       if (isDisplaying && currentHymn) sendCommand('show');
     };
 
+    // Scripture display customization. Changes re-push the current scripture
+    // slide (if one is live) so the operator sees the effect immediately.
+    function refreshScriptureDisplay() {
+      if (!qsChunks.length) return;
+      const ref = (document.getElementById('qsRef')?.value || '').trim();
+      sendScriptureToOverlay(ref, qsChunks[qsChunkIdx]);
+      previewScripture(ref, qsChunks[qsChunkIdx]);
+    }
+    document.getElementById('scriptureFontFamily').onchange = (e) => {
+      settings.scriptureFontFamily = e.target.value;
+      saveSettings();
+      refreshScriptureDisplay();
+    };
+    document.getElementById('scriptureItalic').onchange = (e) => {
+      settings.scriptureItalic = e.target.checked;
+      saveSettings();
+      refreshScriptureDisplay();
+    };
+    document.getElementById('scriptureShowReference').onchange = (e) => {
+      settings.scriptureShowReference = e.target.checked;
+      saveSettings();
+      refreshScriptureDisplay();
+    };
+    document.getElementById('scriptureShowBadge').onchange = (e) => {
+      settings.scriptureShowBadge = e.target.checked;
+      saveSettings();
+      refreshScriptureDisplay();
+    };
+    document.getElementById('scriptureCustomSize').onchange = (e) => {
+      settings.scriptureCustomSize = e.target.checked;
+      document.getElementById('scriptureSizeRow').style.display = e.target.checked ? '' : 'none';
+      saveSettings();
+      refreshScriptureDisplay();
+    };
+    document.getElementById('scriptureFontSize').oninput = (e) => {
+      settings.scriptureFontSize = parseInt(e.target.value, 10);
+      document.getElementById('scriptureFontSizeValue').textContent = settings.scriptureFontSize + 'px';
+      saveSettings();
+      refreshScriptureDisplay();
+    };
+
+    // Persist collapsible panel states so the Style tab reopens as the operator left it
+    document.getElementById('scriptureStylePanel').addEventListener('toggle', (e) => {
+      settings.scripturePanelOpen = e.target.open;
+      saveSettings();
+    });
+    document.getElementById('obsConnPanel').addEventListener('toggle', (e) => {
+      settings.obsPanelOpen = e.target.open;
+      saveSettings();
+    });
+
     document.getElementById('previewToggle').onclick = () => {
       const toggle = document.getElementById('previewToggle');
       const body = document.getElementById('previewBody');
@@ -2191,7 +2271,7 @@
       if (!window.HymnFlowBibleLookup || window.HymnFlowBibleLookup.isLoaded()) return resolve(false);
       if (localStorage.getItem('hymnflow-bible-seeded')) return resolve(false);
       const script = document.createElement('script');
-      script.src = '../data/bible-kjv.js?v=2.6.0';
+      script.src = '../data/bible-kjv.js?v=2.7.0';
       script.onload = () => {
         const seed = window.HymnFlowBible;
         if (!seed) return resolve(false);
@@ -2364,6 +2444,22 @@
     if (obsHostEl) obsHostEl.value = settings.obsWsHost || '127.0.0.1';
     if (obsPortEl) obsPortEl.value = settings.obsWsPort || 4455;
     if (obsPwdEl)  obsPwdEl.value  = settings.obsWsPassword || '';
+
+    // Scripture display customization
+    document.getElementById('scriptureFontFamily').value = settings.scriptureFontFamily || 'serif';
+    document.getElementById('scriptureItalic').checked = settings.scriptureItalic !== false;
+    document.getElementById('scriptureShowReference').checked = settings.scriptureShowReference !== false;
+    document.getElementById('scriptureShowBadge').checked = settings.scriptureShowBadge !== false;
+    document.getElementById('scriptureCustomSize').checked = !!settings.scriptureCustomSize;
+    const qsSize = typeof settings.scriptureFontSize === 'number' ? settings.scriptureFontSize : 44;
+    settings.scriptureFontSize = Math.max(24, Math.min(96, qsSize));
+    document.getElementById('scriptureFontSize').value = settings.scriptureFontSize;
+    document.getElementById('scriptureFontSizeValue').textContent = settings.scriptureFontSize + 'px';
+    document.getElementById('scriptureSizeRow').style.display = settings.scriptureCustomSize ? '' : 'none';
+
+    // Collapsible panel states
+    document.getElementById('scriptureStylePanel').open = !!settings.scripturePanelOpen;
+    document.getElementById('obsConnPanel').open = !!settings.obsPanelOpen;
   }
 
   // ========================================

@@ -49,7 +49,11 @@ server/data/hymns.json.backup
 release/
 artifacts/
 
-# Generated Bible bundles — run scripts/bundle_bible_kjv.py or import via Library tab
-# Not committed: large data files; load via "Import JSON" button in the Library tab instead
+# Generated Bible bundles — run scripts/bundle_bible_kjv.py / scrape_bible_api.py
+# or import via Library tab. Not committed: large data files.
 public/data/bible-kjv.js
+public/data/bible-en-*.js
 public/data/*.json
+
+# Claude Code local settings (machine-specific permissions)
+.claude/settings.local.json

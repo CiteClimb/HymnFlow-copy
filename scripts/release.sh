@@ -24,8 +24,12 @@ fi
 
 # ── Importable data sources ────────────────────────────────────────────────
 # Bibles live in public/data (large files, git-ignored — generate or import).
+# The bible-en-* set is the accuracy-audited curated six from
+# scripts/scrape_bible_api.py (see doc/RELEASE_NOTES_v2.7.0.md).
 # Hymn collections live in hymn-bundle/.
-BIBLES="public/data/bible-kjv.js public/data/en_bbe.json public/data/bible-yor.js"
+BIBLES="public/data/bible-kjv.js public/data/en_bbe.json public/data/bible-yor.js \
+        public/data/bible-en-kjv.js public/data/bible-en-rv.js public/data/bible-en-lsv.js \
+        public/data/bible-en-gnv.js public/data/bible-en-dra.js public/data/bible-en-ojps.js"
 HYMNS="hymn-bundle/cac_ghb.json hymn-bundle/cac_yhb.json hymn-bundle/fws.json \
        hymn-bundle/nnbh.json hymn-bundle/umh.json hymn-bundle/ybh.json hymn-bundle/metadata.json"
 

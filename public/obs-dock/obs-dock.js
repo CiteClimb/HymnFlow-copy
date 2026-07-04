@@ -63,9 +63,11 @@
     scriptureShowBadge: true,
     scriptureCustomSize: false,
     scriptureFontSize: 44,
-    // Collapsible panel states (Style tab)
+    scriptureAutoDisplay: false,  // planned scripture items go live on activation
+    // Collapsible panel states
     scripturePanelOpen: false,
     obsPanelOpen: false,
+    textSlidePanelOpen: false,
     activeTab: 'library',
     obsWsHost: '127.0.0.1',
     obsWsPort: 4455,
@@ -200,11 +202,13 @@
             ? `${idxEntry.sourceAbbrLower} ${idxEntry.number}`
             : '';
 
-          // Search in pre-computed lowercase fields
+          // Search in pre-computed lowercase fields. Single-character queries
+          // match hymn numbers exactly (typing "5" finds hymn 5, not 15/50/...).
+          const numStr = idxEntry.number.toString();
           return (
             idxEntry.titleLower.includes(q) ||
             idxEntry.authorLower.includes(q) ||
-            (q.length > 1 && idxEntry.number.toString().includes(q)) ||
+            (q.length > 1 ? numStr.includes(q) : numStr === q) ||
             idxEntry.sourceAbbrLower.includes(q) ||
             idxEntry.sourceLower.includes(q) ||
             combinedRef.includes(q)
@@ -345,6 +349,8 @@
   let obsWs = null;
   let obsWsRetryTimer = null;
   let obsWsIntentional = false;   // true while user wants to be connected
+  let obsWsRetryCount = 0;        // consecutive failed reconnect attempts
+  let obsWsWasConnected = false;  // to announce unexpected drops exactly once
 
   async function _sha256b64(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -408,6 +414,11 @@
 
       if (msg.op === 2) {  // Identified — handshake complete
         obsWsSetStatus('connected');
+        if (obsWsRetryCount > 0 || !obsWsWasConnected) {
+          statusEl.textContent = 'OBS hotkeys connected';
+        }
+        obsWsRetryCount = 0;
+        obsWsWasConnected = true;
       }
 
       if (msg.op === 5 && msg.d.eventType === 'CustomEvent') {  // Event
@@ -422,6 +433,14 @@
       obsWs = null;
       obsWsSetStatus('disconnected');
       if (obsWsIntentional) {
+        // Announce the drop in the status bar (once), so the operator learns
+        // their global hotkeys died before pressing a dead key mid-service.
+        if (obsWsWasConnected && obsWsRetryCount === 0) {
+          statusEl.textContent = 'OBS hotkeys disconnected — reconnecting…';
+        }
+        obsWsRetryCount++;
+        const badge = document.getElementById('obsWsBadge');
+        if (badge) badge.title = `Disconnected — retrying (attempt ${obsWsRetryCount})`;
         obsWsRetryTimer = setTimeout(obsWsConnect, 5000);
       }
     };
@@ -436,12 +455,17 @@
     saveSettings();
   }
 
-  function highlightMatch(text, query) {
-    if (!query || !text) return escapeHtml(text || '');
-    const escaped = escapeHtml(text);
-    const escapedQuery = escapeHtml(query);
-    if (!escapedQuery) return escaped;
-    const regex = new RegExp(escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  // Builds the highlight regex once per render (renderList calls this once,
+  // not per row) — pass the result to highlightMatch.
+  function buildHighlightRegex(query) {
+    const escapedQuery = escapeHtml(query || '');
+    if (!escapedQuery) return null;
+    return new RegExp(escapedQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  }
+
+  function highlightMatch(text, regex) {
+    const escaped = escapeHtml(text || '');
+    if (!regex || !escaped) return escaped;
     return escaped.replace(regex, m => `<mark>${m}</mark>`);
   }
 
@@ -463,7 +487,7 @@
     const capped = total > LIST_CAP;
     if (capped) display = display.slice(0, LIST_CAP);
 
-    const q = currentSearchQuery.trim();
+    const hlRegex = buildHighlightRegex(currentSearchQuery.trim());
     listEl.innerHTML = display.map(h => {
       const sourceAbbr = h.metadata?.sourceAbbr || '';
       const number = h.metadata?.number || '';
@@ -474,7 +498,7 @@
         hymnRef = `${number} - `;
       }
       const fullTitle = hymnRef + (typeof h.title === 'string' ? h.title : String(h.title ?? ''));
-      const highlightedTitle = highlightMatch(fullTitle, q);
+      const highlightedTitle = highlightMatch(fullTitle, hlRegex);
       const safeAuthor = escapeHtml(typeof h.author === 'string' ? h.author || 'Unknown' : 'Unknown');
       const isActive = currentHymn && currentHymn.id === h.id ? ' active' : '';
       const versesLabel = window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('hymns.labels.versesCount', { count: h.verses.length }) : `${h.verses.length} verse(s)`;
@@ -527,7 +551,14 @@
     updatePreview();
     updateServiceBanner();
     renderList();
-    if (isDisplaying) sendCommand('show');
+    if (isDisplaying) {
+      sendCommand('show');
+    } else {
+      // Most common "why is the screen blank" moment: hymn selected, Display off
+      statusEl.textContent = window.HymnFlowI18n
+        ? window.HymnFlowI18n.getTranslation('display.displayOffHint')
+        : 'Display is OFF — flip the Display switch to show this hymn';
+    }
   }
 
   function getSettingsSnapshot() {
@@ -644,13 +675,20 @@
 
     if (window.HymnFlowI18n) {
       const i18nKey = (isShowingChorus && currentHymn.chorus) ? 'navigation.chorusInfo' : 'navigation.verseInfo';
+      // Sequence hint: with a chorus, "Next" inserts it after every verse —
+      // surface that so the flow isn't a surprise mid-song.
+      const chorusNext = (currentHymn.chorus && !isShowingChorus) ? ' · Chorus next' : '';
+      // The overlay auto-shrinks over-long text to fit; warn the operator that
+      // the projector render will be smaller than the configured size.
+      const windowedChars = windowed.join(' ').length;
+      const fitHint = windowedChars > slideCharBudget() ? ' · ⚠ shrinks to fit' : '';
       verseInfoEl.textContent = window.HymnFlowI18n.getTranslation(i18nKey, {
         current: currentVerse + 1,
         total: currentHymn.verses.length,
         startLine: currentLineOffset + 1,
         endLine: Math.min(lines.length, currentLineOffset + settings.linesPerPage),
         totalLines: lines.length
-      }) + isLastVerseLabel;
+      }) + isLastVerseLabel + chorusNext + fitHint;
     }
 
     updateNavButtonStates();
@@ -686,7 +724,16 @@
         updateDisplayButton();
         return;
       }
-      if (!currentHymn) return;
+      if (!currentHymn) {
+        // Nothing to show — resync the toggle so it can't sit ON while the
+        // screen is empty, and tell the operator why nothing happened.
+        isDisplaying = false;
+        updateDisplayButton();
+        statusEl.textContent = window.HymnFlowI18n
+          ? window.HymnFlowI18n.getTranslation('display.noHymnSelected')
+          : 'Nothing to display — select a hymn first';
+        return;
+      }
 
       const lines = getCurrentLines();
       const windowed = lines.slice(currentLineOffset, currentLineOffset + settings.linesPerPage);
@@ -964,15 +1011,16 @@
     if (next) next.disabled = total === 0 || qsChunkIdx >= total - 1;
   }
 
+  // Returns true when the reference resolved (used by auto-display).
   function qsLookup() {
     const refInput = document.getElementById('qsRef');
     const textArea = document.getElementById('qsText');
     const ref = (refInput?.value || '').trim();
-    if (!ref) { refInput?.focus(); return; }
+    if (!ref) { refInput?.focus(); return false; }
 
     if (!window.HymnFlowBibleLookup?.isLoaded()) {
       if (statusEl) statusEl.textContent = 'Bible not loaded — import a translation in the Library tab';
-      return;
+      return false;
     }
 
     const result = window.HymnFlowBibleLookup.lookup(ref);
@@ -988,9 +1036,11 @@
       if (statusEl) statusEl.textContent = result.verseCount > 1
         ? `Found ${result.verseCount} verses — press Display, then use ← → to step through`
         : `Found: ${result.reference} — press Display to send to overlay`;
+      return true;
     } else {
       if (statusEl) statusEl.textContent = result.error;
       refInput?.select();
+      return false;
     }
   }
 
@@ -1045,6 +1095,17 @@
     currentLineOffset = 0;
     updatePreview();
     sendCommand('show');
+  }
+
+  // Calm "take the screen down" — hides both overlay channels but keeps the
+  // current hymn, service position, and scripture pages so the operator can
+  // resume instantly. Emergency Clear below is the full reset.
+  function blankScreen() {
+    sendCommand('hide');
+    _clearTextSlideOnly();
+    statusEl.textContent = window.HymnFlowI18n
+      ? window.HymnFlowI18n.getTranslation('display.blanked')
+      : 'Screen blanked — Display or Quick Scripture will bring it back';
   }
 
   function emergencyClear() {
@@ -1715,12 +1776,17 @@
       switchTab('live');
       const qsRefEl = document.getElementById('qsRef');
       if (qsRefEl) qsRefEl.value = item.label || '';
-      qsLookup();
+      const found = qsLookup();
+      // Opt-in: rehearsed services can skip the confidence-preview step
+      if (found && settings.scriptureAutoDisplay) displayQuickScripture();
     } else if (item.type === 'announce') {
       sendOverlayTextSlide(item.text || item.label || '', { scripture: false });
       statusEl.textContent = item.label || 'Announcement displayed';
     } else if (item.type === 'divider') {
+      // A section divider takes the whole screen down — both channels — so
+      // the last hymn verse doesn't linger through "— SERMON —".
       _clearTextSlideOnly();
+      if (isDisplaying) sendCommand('hide');
       statusEl.textContent = window.HymnFlowI18n
         ? window.HymnFlowI18n.getTranslation('services.status.divider', { label: item.label || 'Section' })
         : `▸ ${item.label || 'Section'}`;
@@ -2038,6 +2104,17 @@
     document.getElementById('btnNextLine').onclick = nextLineWindow;
     document.getElementById('btnJumpChorus').onclick = jumpToChorus;
     document.getElementById('btnClear').onclick = emergencyClear;
+    document.getElementById('btnBlank').onclick = blankScreen;
+
+    // Pulse the status bar whenever its message changes, so rapid successive
+    // messages don't silently overwrite each other unnoticed.
+    if (statusEl) {
+      new MutationObserver(() => {
+        statusEl.classList.remove('status-pulse');
+        void statusEl.offsetWidth; // restart the CSS animation
+        statusEl.classList.add('status-pulse');
+      }).observe(statusEl, { childList: true, characterData: true, subtree: true });
+    }
     document.getElementById('btnReset').onclick = resetPosition;
     document.getElementById('displayToggle').onchange = toggleDisplay;
 
@@ -2184,10 +2261,18 @@
       saveSettings();
       refreshScriptureDisplay();
     };
+    document.getElementById('scriptureAutoDisplay').onchange = (e) => {
+      settings.scriptureAutoDisplay = e.target.checked;
+      saveSettings();
+    };
 
     // Persist collapsible panel states so the Style tab reopens as the operator left it
     document.getElementById('scriptureStylePanel').addEventListener('toggle', (e) => {
       settings.scripturePanelOpen = e.target.open;
+      saveSettings();
+    });
+    document.getElementById('textSlidePanel').addEventListener('toggle', (e) => {
+      settings.textSlidePanelOpen = e.target.open;
       saveSettings();
     });
     document.getElementById('obsConnPanel').addEventListener('toggle', (e) => {
@@ -2737,6 +2822,7 @@
     document.getElementById('scriptureShowReference').checked = settings.scriptureShowReference !== false;
     document.getElementById('scriptureShowBadge').checked = settings.scriptureShowBadge !== false;
     document.getElementById('scriptureCustomSize').checked = !!settings.scriptureCustomSize;
+    document.getElementById('scriptureAutoDisplay').checked = !!settings.scriptureAutoDisplay;
     const qsSize = typeof settings.scriptureFontSize === 'number' ? settings.scriptureFontSize : 44;
     settings.scriptureFontSize = Math.max(24, Math.min(96, qsSize));
     document.getElementById('scriptureFontSize').value = settings.scriptureFontSize;
@@ -2746,6 +2832,7 @@
     // Collapsible panel states
     document.getElementById('scriptureStylePanel').open = !!settings.scripturePanelOpen;
     document.getElementById('obsConnPanel').open = !!settings.obsPanelOpen;
+    document.getElementById('textSlidePanel').open = !!settings.textSlidePanelOpen;
   }
 
   // ========================================

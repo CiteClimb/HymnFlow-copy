@@ -34,8 +34,10 @@
       <button id="tab-btn-style" class="tab-btn" data-tab="style" role="tab" aria-selected="false" aria-controls="tab-style" tabindex="-1" data-i18n="tabs.style">Style</button>
     </nav>
 
-    <!-- Emergency Clear: always accessible regardless of active tab -->
+    <!-- Blank + Emergency Clear: always accessible regardless of active tab -->
     <div class="emergency-bar">
+      <button id="btnBlank" class="btn btn-secondary btn-blank"
+        title="Take the screen down without losing your place">Blank Screen</button>
       <button id="btnClear" class="btn btn-emergency" data-i18n="navigation.buttons.emergencyClear"
         data-i18n-aria="navigation.buttons.emergencyClear"
         data-i18n-title="navigation.tooltips.emergencyClear">&#9940; Emergency Clear</button>
@@ -212,10 +214,11 @@
           <label class="control-label" for="linesPerPage" data-i18n="display.linesPerDisplay">Lines per display</label>
           <div class="slider-container">
             <span class="slider-value" aria-hidden="true">2</span>
-            <input type="range" id="linesPerPage" min="2" max="6" value="2" class="slider"
-              data-i18n-aria="display.linesPerDisplay" aria-label="Lines per display" aria-valuemin="2"
+            <input type="range" id="linesPerPage" min="1" max="6" value="2" class="slider"
+              data-i18n-aria="display.linesPerDisplay" aria-label="Lines per display" aria-valuemin="1"
               aria-valuemax="6" aria-valuenow="2">
             <div class="slider-marks">
+              <span>1</span>
               <span>2</span>
               <span>3</span>
               <span>4</span>
@@ -253,11 +256,11 @@
         </div>
       </section>
 
-      <section class="section">
-        <div class="section-header">
+      <details class="section collapsible-section" id="textSlidePanel">
+        <summary>
           <h3 data-i18n="textSlide.title">Text Slide</h3>
           <span class="text-slide-hint" data-i18n="textSlide.hint">scripture, announcement, blank</span>
-        </div>
+        </summary>
         <textarea id="textSlideInput" class="text-slide-textarea" rows="3"
           placeholder="Type any text to send to overlay&#10;(scripture, announcement, blank screen...)"></textarea>
         <div class="text-slide-actions">
@@ -265,7 +268,7 @@
           <button id="btnClearTextSlide" class="btn btn-secondary" data-i18n="textSlide.clearButton">Clear
             Slide</button>
         </div>
-      </section>
+      </details>
 
       <section class="section section-preview" id="previewSection">
         <button class="preview-toggle" id="previewToggle" aria-expanded="false" aria-controls="previewBody">
@@ -287,6 +290,7 @@
         <div id="stylesBody" class="styles-form">
           <label class="form-label">
             <span data-i18n="styles.fontFamily">Font Family</span>
+            <!-- Keep options in sync with FONT_ALLOWLIST in obs-overlay/overlay.js -->
             <select id="fontFamily" class="form-select">
               <option value="Inter, sans-serif">Inter</option>
               <option value="'Segoe UI', sans-serif">Segoe UI</option>
@@ -402,6 +406,7 @@
             <label class="checkbox-label"><input type="checkbox" id="scriptureShowReference" checked> <span>Show reference</span></label>
             <label class="checkbox-label"><input type="checkbox" id="scriptureShowBadge" checked> <span>Translation badge</span></label>
             <label class="checkbox-label"><input type="checkbox" id="scriptureCustomSize"> <span>Custom size</span></label>
+            <label class="checkbox-label" title="Skip the confidence preview: planned scripture items go straight to the overlay when activated"><input type="checkbox" id="scriptureAutoDisplay"> <span>Auto-display planned scripture</span></label>
           </div>
 
           <label class="form-label" id="scriptureSizeRow" style="display: none;">

@@ -108,8 +108,13 @@
       <section class="section">
         <div class="section-header">
           <h3 data-i18n="services.title">Services</h3>
-          <button id="btnNewService" class="btn btn-add" style="margin: 0;" data-i18n="services.newButton"
-            data-i18n-aria="services.newButton" data-i18n-title="services.newButton">+ New</button>
+          <div class="action-group">
+            <button id="btnImportService" class="btn btn-secondary" style="margin: 0;"
+              title="Import a service schedule from a text file">Import</button>
+            <button id="btnNewService" class="btn btn-add" style="margin: 0;" data-i18n="services.newButton"
+              data-i18n-aria="services.newButton" data-i18n-title="services.newButton">+ New</button>
+          </div>
+          <input type="file" id="serviceFileInput" accept=".txt" hidden aria-label="Select service schedule text file">
         </div>
         <div id="servicesList" class="services-list" role="list" aria-label="Saved services"></div>
         <div id="serviceEditor" class="service-editor" style="display: none;">

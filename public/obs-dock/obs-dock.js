@@ -1360,6 +1360,7 @@
             <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowSelectService('${service.id}')">${window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('services.buttons.load') : 'Load'}</button>
             <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowEditService('${service.id}')">${window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('services.buttons.edit') : 'Edit'}</button>
             <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowDuplicateService('${service.id}')" title="Duplicate this service">Dup</button>
+            <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowExportService('${service.id}')" title="Export schedule as text file">Txt</button>
             <button class="btn btn-remove" onclick="event.stopPropagation(); window.hymnflowDeleteService('${service.id}')">${window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('services.buttons.delete') : 'Del'}</button>
           </div>
           ${isActive ? `<div class="service-hymns-list" role="list">${itemsHtml}</div>` : ''}
@@ -1705,12 +1706,169 @@
     statusEl.textContent = `Duplicated: "${copy.name}"`;
   }
 
+  // ── Service schedule text export / import ─────────────────────────────────
+  // Format (round-trippable, hand-editable):
+  //   Service: Sunday Morning
+  //
+  //   1. Hymn: 234 - Amazing Grace
+  //      Notes: pianist starts soft
+  //   2. Scripture: John 3:16-18
+  //   3. Announce: Youth meeting Wednesday 5pm
+  //      Bring your Bibles
+  //   4. Divider: — SERMON —
+  // Indented lines attach to the item above them (Notes: → cue notes;
+  // anything else continues an announcement). "#" lines are comments.
+
+  function serviceToText(service) {
+    const lines = [`Service: ${service.name}`, ''];
+    service.items.forEach((item, i) => {
+      const n = `${i + 1}. `;
+      if (item.type === 'hymn') {
+        lines.push(`${n}Hymn: ${itemDisplayLabel(item)}`);
+      } else if (item.type === 'announce') {
+        const txt = (item.text || item.label || '').split('\n');
+        lines.push(`${n}Announce: ${txt[0]}`);
+        txt.slice(1).forEach(t => lines.push(`   ${t}`));
+      } else {
+        // scripture, divider — label carries the content
+        lines.push(`${n}${itemTypeBadge(item.type)}: ${item.label || ''}`);
+      }
+      if (item.notes) {
+        String(item.notes).split('\n').forEach(t => lines.push(`   Notes: ${t}`));
+      }
+    });
+    return lines.join('\n') + '\n';
+  }
+
+  function exportServiceTxt(serviceId) {
+    const service = services.find(s => s.id === serviceId);
+    if (!service) return;
+    const slug = (service.name || 'service').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'service';
+    const filename = `hymnflow-service-${slug}.txt`;
+    const blob = new Blob([serviceToText(service)], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    statusEl.textContent = `Exported ${filename}`;
+  }
+
+  // Finds a hymn from "234 - Amazing Grace", "234" or "Amazing Grace".
+  // Number match wins, then exact title, then title-contains.
+  function resolveHymnFromText(content) {
+    const m = content.match(/^(\d+)\s*[-–.]?\s*(.*)$/);
+    if (m) {
+      const byNum = hymns.find(x => String(x.metadata?.number ?? '') === m[1]);
+      if (byNum) return byNum;
+    }
+    const title = ((m && m[2]) ? m[2] : content).trim().toLowerCase();
+    if (!title) return null;
+    return hymns.find(x => x.title.toLowerCase() === title)
+        || hymns.find(x => x.title.toLowerCase().includes(title))
+        || null;
+  }
+
+  function announceLabel(text) {
+    return text.length > 35 ? text.substring(0, 35) + '…' : text;
+  }
+
+  // Parses schedule text into { name, items, warnings }.
+  // Untyped lines are resolved as hymn → scripture reference → announcement.
+  function parseServiceText(text, fallbackName) {
+    let name = '';
+    const items = [];
+    const warnings = [];
+    for (const raw of String(text).split(/\r?\n/)) {
+      const line = raw.replace(/\s+$/, '');
+      if (!line.trim() || /^\s*#/.test(line)) continue;
+
+      // Indented lines belong to the previous item
+      if (/^\s/.test(line) && items.length) {
+        const prev = items[items.length - 1];
+        const nm = line.trim().match(/^Notes:\s*(.*)$/i);
+        if (nm) {
+          prev.notes = prev.notes ? prev.notes + '\n' + nm[1] : nm[1];
+        } else if (prev.type === 'announce') {
+          prev.text += '\n' + line.trim();
+          prev.label = announceLabel(prev.text);
+        } else {
+          prev.notes = prev.notes ? prev.notes + '\n' + line.trim() : line.trim();
+        }
+        continue;
+      }
+
+      const sm = line.match(/^Service:\s*(.*)$/i);
+      if (sm) { name = sm[1].trim(); continue; }
+
+      const im = line.trim().match(/^(?:\d+[.)]\s*)?(?:(Hymn|Scripture|Announce(?:ment)?|Divider)\s*:\s*)?(.+)$/i);
+      if (!im) continue;
+      const type = (im[1] || '').toLowerCase();
+      const content = im[2].trim();
+
+      if (type.startsWith('announce')) {
+        items.push({ type: 'announce', label: announceLabel(content), text: content });
+      } else if (type === 'scripture') {
+        items.push({ type: 'scripture', label: content });
+        if (window.HymnFlowBibleLookup?.isLoaded() && !window.HymnFlowBibleLookup.canParse(content)) {
+          warnings.push(`Unrecognised scripture reference: "${content}"`);
+        }
+      } else if (type === 'divider') {
+        items.push({ type: 'divider', label: content });
+      } else if (type === 'hymn') {
+        const h = resolveHymnFromText(content);
+        if (h) items.push({ type: 'hymn', hymnId: h.id });
+        else {
+          items.push({ type: 'divider', label: `(hymn not in library) ${content}` });
+          warnings.push(`Hymn not found in library: "${content}"`);
+        }
+      } else {
+        // Untyped line: hymn → scripture → announcement
+        const h = resolveHymnFromText(content);
+        if (h) items.push({ type: 'hymn', hymnId: h.id });
+        else if (window.HymnFlowBibleLookup?.isLoaded() && window.HymnFlowBibleLookup.canParse(content)) {
+          items.push({ type: 'scripture', label: content });
+        } else {
+          items.push({ type: 'announce', label: announceLabel(content), text: content });
+        }
+      }
+    }
+    return { name: name || fallbackName, items, warnings };
+  }
+
+  function handleServiceImport(e) {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const fallback = file.name.replace(/\.txt$/i, '').replace(/^hymnflow-service-/i, '').replace(/[-_]+/g, ' ').trim() || 'Imported Service';
+      const { name, items, warnings } = parseServiceText(ev.target.result, fallback);
+      if (!items.length) {
+        statusEl.textContent = 'Import failed: no service items found in file';
+        return;
+      }
+      services.push({ id: generateUniqueServiceId(), name, items });
+      saveServices();
+      renderServicesList();
+      statusEl.textContent = `Imported "${name}" — ${items.length} item${items.length !== 1 ? 's' : ''}${warnings.length ? `, ${warnings.length} warning${warnings.length !== 1 ? 's' : ''}` : ''}`;
+      if (warnings.length) {
+        console.warn('[Service Import]', warnings);
+        alert('Service imported with warnings:\n\n' + warnings.join('\n'));
+      }
+    };
+    reader.onerror = () => { statusEl.textContent = 'Could not read file'; };
+    reader.readAsText(file);
+  }
+
   // Global functions for onclick handlers
   window.hymnflowSelectService = selectService;
   window.hymnflowSelectItemFromService = selectItemFromService;
   window.hymnflowEditService = openServiceEditor;
   window.hymnflowDeleteService = deleteService;
   window.hymnflowDuplicateService = duplicateService;
+  window.hymnflowExportService = exportServiceTxt;
   window.hymnflowPickHymn = (hymnId) => {
     if (!editingService) return;
     editingService.items.push({ type: 'hymn', hymnId });
@@ -2010,6 +2168,8 @@
 
     // Service controls
     document.getElementById('btnNewService').onclick = () => openServiceEditor();
+    document.getElementById('btnImportService').onclick = () => document.getElementById('serviceFileInput').click();
+    document.getElementById('serviceFileInput').addEventListener('change', handleServiceImport);
     document.getElementById('btnAddToService').onclick = () => {
       if (!editingService) return;
       const btn = document.getElementById('btnAddToService');

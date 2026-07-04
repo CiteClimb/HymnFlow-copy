@@ -1,6 +1,6 @@
 # 🎵 HymnFlow — OBS Studio Hymn & Scripture Display Plugin
 
-**v2.6.0** · [Changelog](doc/CHANGELOG.md) · [Setup Guide](doc/SETUP.md) · [Full Docs](doc/OBS_DOCK_README.md)
+**v2.7.0** · [Changelog](doc/CHANGELOG.md) · [Setup Guide](doc/SETUP.md) · [Full Docs](doc/OBS_DOCK_README.md) · [Releases](https://github.com/ebena107/HymnFlow/releases)
 
 HymnFlow is a browser-based OBS Studio plugin for displaying hymns and scripture during worship services. It runs entirely in the browser — no server, no Node.js, no installation. A custom dock controls the presentation; a browser source overlays text on your stream.
 
@@ -8,7 +8,8 @@ HymnFlow is a browser-based OBS Studio plugin for displaying hymns and scripture
 
 - 🗂️ **Tabbed Dock** — Library, Service, Live, and Style tabs keep controls organized
 - 📅 **Full Service Planning** — Build and save service orders with Hymns, Scripture, Announcements, and Dividers; drag-and-drop reorder, duplicate services, notes/cues per item
-- 📖 **Multi-Translation Bible Lookup** — Import any public-domain Bible (KJV, ASV, RVR, Almeida…); Quick Scripture panel for live verse lookup; persistent via IndexedDB
+- 📖 **Multi-Translation Bible Lookup** — Plug-and-play: KJV auto-loads on first run; import any public-domain Bible; Quick Scripture panel for live verse lookup (flexible references: `John 3:16`, `Rom 8:28-30`, `Rom 8 28 30`, `Juan 3:16`); persistent via IndexedDB
+- 📜 **Scripture Display Styling** — Dedicated serif look for scripture with reference header + translation badge, all customizable: font, italics, header/badge visibility, independent size
 - ⌨️ **Keyboard Navigation** — Arrow keys for verse/line navigation; `[` / `]` for service items; configurable global hotkeys via OBS
 - 🎛️ **Global OBS Hotkeys** — Control HymnFlow from any OBS window via obs-websocket + included Python script; hotkeys registered natively in OBS Settings → Hotkeys
 - 🎨 **Customizable Styling** — Fonts, colors, text effects, backgrounds, animations, position
@@ -45,7 +46,7 @@ Width  : 1920   Height : 1080
 
 ### Step 3: Import Hymns
 
-Hymn collections are **not included** in the main download (keeps it at ~150 KB). Download from the [hymn-bundle folder](https://github.com/ebena107/HymnFlow/tree/master/hymn-bundle) and import via Library → Import.
+The `-lite` release bundle ships one default hymnal (nnbh); the `-full` and `-data` bundles include all collections. Additional collections can be downloaded from the [hymn-bundle folder](https://github.com/ebena107/HymnFlow/tree/master/hymn-bundle) and imported via Library → Import.
 
 ### Step 4 (Optional): Enable Global Hotkeys
 
@@ -72,11 +73,11 @@ See [obs-setup.html](public/obs-setup.html) for the full interactive guide.
 
 ## 📖 Bible Lookup
 
-Bible data is not bundled — import a free public-domain JSON file.
+**Works out of the box** — on first launch the dock auto-loads the bundled KJV, so scripture lookup needs no setup.
 
-**Quick-start (KJV):**
-1. Download: [thiagobodruk/bible → en_kjv.json](https://github.com/thiagobodruk/bible/blob/master/json/en_kjv.json) (click Raw → Save As)
-2. Library tab → Bible section → name `KJV` → **Import JSON**
+**Curated translations (included in the `-full` and `-data` release bundles):** six public-domain translations that passed a systematic accuracy audit — clean **KJV 1769**, **Revised Version 1885**, **Literal Standard Version**, **Geneva Bible 1599**, **Douay-Rheims**¹, and **JPS 1917 Tanakh** (OT only). Import via Library → Bible → **Import JSON**.
+
+¹ *Douay-Rheims uses Vulgate Psalm numbering (Psalm N ≈ Hebrew Psalm N+1).*
 
 **Other translations available at:**
 
@@ -113,6 +114,9 @@ Style tab controls:
 | Background | Transparent, solid, or gradient |
 | Animation | Fade, slide, or none |
 | Position | Bottom-third, middle, or top |
+| Scripture Display | Serif/system font, italics, reference header, translation badge, independent size |
+
+The **OBS Connection** and **Scripture Display** sections are collapsible panels — their open/closed state is remembered.
 
 ## 🌍 Internationalization
 
@@ -135,7 +139,8 @@ scripts/
 ├── hymnflow-obs-hotkeys.py   # OBS Script — global hotkey bridge
 ├── convert_bible_txt.py      # Generic Bible text → HymnFlow JSON converter
 ├── convert_yoruba_bible.py   # Yoruba Bible converter
-└── bundle_bible_kjv.py       # KJV downloader / converter
+├── bundle_bible_kjv.py       # KJV downloader / converter
+└── scrape_bible_api.py       # Multi-translation scraper (audited, curated output)
 
 hymn-bundle/            # SEPARATE DOWNLOAD — hymn collection JSON files
 ```

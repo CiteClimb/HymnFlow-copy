@@ -32,6 +32,17 @@ HymnFlow runs entirely in the browser with no backend server:
 - **Browser isolation**: Inaccessible from other origins
 - **User responsibility**: Users can clear browser data anytime
 
+### OBS WebSocket Password
+
+The optional global-hotkeys integration stores the obs-websocket password in
+localStorage **as plain text** (there is no server to keep a secret on). This
+is acceptable for the typical setup — a password for a WebSocket server on
+`127.0.0.1` of the same machine — but:
+
+- Use a **dedicated password** for obs-websocket, never one shared with other accounts
+- On shared/kiosk machines, prefer running obs-websocket **without authentication**
+  bound to localhost only, rather than storing a reused password
+
 ### File Access
 
 - **Same-origin policy**: Both dock and overlay must be from same origin

@@ -56,11 +56,10 @@
     // 1. Try current language
     let value = getValue(translations);
 
-    // 2. Fallback to English if not found
-    if (value === null && currentLanguage !== DEFAULT_LANGUAGE) {
-      if (window.HymnFlowTranslations && window.HymnFlowTranslations[DEFAULT_LANGUAGE]) {
-        value = getValue(window.HymnFlowTranslations[DEFAULT_LANGUAGE]);
-      }
+    // 2. Fallback to the English dictionary if not found. Also covers calls
+    // made before init() has populated `translations` (dock renders eagerly).
+    if (value === null && window.HymnFlowTranslations && window.HymnFlowTranslations[DEFAULT_LANGUAGE]) {
+      value = getValue(window.HymnFlowTranslations[DEFAULT_LANGUAGE]);
     }
 
     // 3. Last resort: return the key itself

@@ -194,7 +194,10 @@ window.HymnFlowTranslations = {
       "liveIndicator": "LIVE",
       "resetButton": "Reset",
       "resetTooltip": "Reset to first verse, first line",
-      "linesPerDisplay": "Lines per display"
+      "linesPerDisplay": "Lines per display",
+      "noHymnSelected": "Nothing to display — select a hymn first",
+      "displayOffHint": "Display is OFF — flip the Display switch to show this hymn",
+      "blanked": "Screen blanked — Display or Quick Scripture will bring it back"
     },
     "preview": {
       "title": "Hymn Previews"

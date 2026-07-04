@@ -11,6 +11,9 @@
     return HEX_COLOR.test(val) ? val : fallback;
   }
 
+  // Security allowlist — the overlay never trusts font strings from the dock
+  // payload. Keep in sync with the Style tab's font <select> options in
+  // obs-dock/index.html (fontFamily and scriptureFontFamily).
   const FONT_ALLOWLIST = new Set([
     'Inter, sans-serif',
     "'Segoe UI', sans-serif",
@@ -128,6 +131,14 @@
     }
   }
 
+  // Pending hide timer — must be cancelled by any show, or a hide followed
+  // within its animation window by a new push would blank the fresh content.
+  let hideTimer = null;
+
+  function cancelPendingHide() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  }
+
   function show(data) {
     const { title, verseNumber, totalVerses, lines, settings } = data;
     const sourceAbbr = data.metadata?.sourceAbbr || '';
@@ -138,6 +149,7 @@
         ? `${hymnNumber} • `
         : '';
     
+    cancelPendingHide();
     applyStyles(settings);
     overlayEl.classList.remove('scripture');
 
@@ -166,21 +178,27 @@
 
   function hide(settings) {
     if (!isVisible) return;
+    cancelPendingHide();
     overlayEl.classList.remove('fade-in', 'slide-in');
-    if (settings && settings.animation === 'fade') {
-      overlayEl.classList.add('fade-out');
-    } else if (settings && settings.animation === 'slide') {
-      overlayEl.classList.add('slide-out');
-    }
-    setTimeout(() => {
+    const animated = settings && (settings.animation === 'fade' || settings.animation === 'slide');
+    if (animated) {
+      overlayEl.classList.add(settings.animation === 'fade' ? 'fade-out' : 'slide-out');
+      hideTimer = setTimeout(() => {
+        hideTimer = null;
+        overlayEl.classList.add('hidden');
+        overlayEl.classList.remove('visible', 'fade-out', 'slide-out');
+      }, 600);
+    } else {
+      // No animation configured — take the screen down instantly
       overlayEl.classList.add('hidden');
       overlayEl.classList.remove('visible', 'fade-out', 'slide-out');
-    }, 600);
+    }
     isVisible = false;
   }
 
   function showTextSlide(data) {
     const { lines, settings } = data;
+    cancelPendingHide();
     applyStyles(settings);
     const text = Array.isArray(lines) ? lines.join('\n') : String(lines);
 

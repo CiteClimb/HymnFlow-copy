@@ -1292,6 +1292,11 @@ body {
   gap: 6px;
 }
 
+/* display:flex above would otherwise override the hidden attribute */
+.item-inline-panel[hidden] {
+  display: none;
+}
+
 .item-form-title {
   font-size: 11px;
   font-weight: 700;
@@ -1339,9 +1344,63 @@ body {
   border-bottom: none;
 }
 
-.hymn-picker-item:hover {
+.hymn-picker-item:hover,
+.hymn-picker-item.active {
   background: rgba(74, 158, 255, 0.15);
   color: var(--primary);
+}
+
+.hymn-picker-cap {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+/* Unsaved-changes indicator on the service Save button */
+#btnSaveService.dirty {
+  box-shadow: 0 0 0 2px var(--warning);
+}
+
+#btnSaveService.dirty::after {
+  content: " •";
+  color: var(--warning);
+}
+
+/* Per-service overflow (⋯) menu */
+.service-more {
+  position: relative;
+}
+
+.service-more summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.service-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.service-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  min-width: 130px;
+}
+
+.service-more-menu .btn {
+  width: 100%;
+  text-align: left;
 }
 
 .hymn-picker-empty {

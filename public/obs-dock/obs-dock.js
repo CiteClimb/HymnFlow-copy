@@ -1359,14 +1359,85 @@
           <div class="service-item-actions">
             <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowSelectService('${service.id}')">${window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('services.buttons.load') : 'Load'}</button>
             <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowEditService('${service.id}')">${window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('services.buttons.edit') : 'Edit'}</button>
-            <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowDuplicateService('${service.id}')" title="Duplicate this service">Dup</button>
-            <button class="btn btn-secondary" onclick="event.stopPropagation(); window.hymnflowExportService('${service.id}')" title="Export schedule as text file">Txt</button>
-            <button class="btn btn-remove" onclick="event.stopPropagation(); window.hymnflowDeleteService('${service.id}')">${window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('services.buttons.delete') : 'Del'}</button>
+            <details class="service-more" onclick="event.stopPropagation()">
+              <summary class="btn btn-secondary" title="More actions" aria-label="More actions for ${safeServiceName}">⋯</summary>
+              <div class="service-more-menu">
+                <button class="btn btn-secondary" onclick="this.closest('details').open = false; window.hymnflowDuplicateService('${service.id}')">Duplicate</button>
+                <button class="btn btn-secondary" onclick="this.closest('details').open = false; window.hymnflowExportService('${service.id}')">Export .txt</button>
+                <button class="btn btn-remove" onclick="this.closest('details').open = false; window.hymnflowDeleteService('${service.id}')">${window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation('services.buttons.delete') : 'Delete'}</button>
+              </div>
+            </details>
           </div>
           ${isActive ? `<div class="service-hymns-list" role="list">${itemsHtml}</div>` : ''}
         </div>
       `;
     }).join('');
+  }
+
+  // ── Editor dirty state, draft persistence and layered closing ─────────────
+  const SERVICE_DRAFT_KEY = 'hymnflow-service-draft';
+
+  // Marks the editor dirty, reflects it on the Save button, and snapshots a
+  // draft so a dock reload (OBS scene change, crash, F5) can't lose the edit.
+  function markServiceDirty() {
+    serviceEditorDirty = true;
+    updateServiceSaveButton();
+    saveServiceDraft();
+  }
+
+  function updateServiceSaveButton() {
+    const btn = document.getElementById('btnSaveService');
+    if (!btn) return;
+    // Dot is CSS ::after so i18n text replacement can't wipe it
+    btn.classList.toggle('dirty', serviceEditorDirty);
+    btn.title = serviceEditorDirty ? 'You have unsaved changes' : '';
+  }
+
+  function saveServiceDraft() {
+    try {
+      if (!editingService) { sessionStorage.removeItem(SERVICE_DRAFT_KEY); return; }
+      const nameInput = document.getElementById('serviceName');
+      const snapshot = { ...editingService, name: nameInput ? nameInput.value : editingService.name };
+      sessionStorage.setItem(SERVICE_DRAFT_KEY, JSON.stringify(snapshot));
+    } catch (e) { /* storage full/unavailable — draft is best-effort */ }
+  }
+
+  function clearServiceDraft() {
+    try { sessionStorage.removeItem(SERVICE_DRAFT_KEY); } catch (e) { /* ignore */ }
+  }
+
+  // Reopens an in-progress edit after a dock reload.
+  function restoreServiceDraft() {
+    let draft = null;
+    try { draft = JSON.parse(sessionStorage.getItem(SERVICE_DRAFT_KEY)); } catch (e) { /* ignore */ }
+    if (!draft || !Array.isArray(draft.items)) return;
+    switchTab('service');
+    openServiceEditor();
+    editingService = draft;
+    document.getElementById('serviceName').value = draft.name || '';
+    renderServiceItems();
+    markServiceDirty();
+    statusEl.textContent = 'Restored unsaved service draft';
+  }
+
+  // Which "+ ..." button opened the item form, so focus can return to it.
+  let itemFormTriggerId = null;
+
+  function closeItemForm(returnFocus = true) {
+    document.getElementById('itemForm').hidden = true;
+    currentItemFormType = null;
+    editingItemIndex = null;
+    if (returnFocus && itemFormTriggerId) {
+      document.getElementById(itemFormTriggerId)?.focus();
+    }
+    itemFormTriggerId = null;
+  }
+
+  function closeHymnPicker(returnFocus = true) {
+    document.getElementById('hymnPicker').hidden = true;
+    const btn = document.getElementById('btnAddToService');
+    btn.setAttribute('aria-pressed', 'false');
+    if (returnFocus) btn.focus();
   }
 
   function openServiceEditor(serviceId = null) {
@@ -1380,8 +1451,11 @@
       editingService = JSON.parse(JSON.stringify(original));
       nameInput.value = editingService.name;
     } else {
-      editingService = { id: generateUniqueServiceId(), name: '', items: [] };
-      nameInput.value = '';
+      // Prefilled name saves a keystroke on the most common flow; kept
+      // selected so typing replaces it instantly.
+      const defaultName = `Service — ${new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}`;
+      editingService = { id: generateUniqueServiceId(), name: defaultName, items: [] };
+      nameInput.value = defaultName;
     }
 
     document.getElementById('hymnPicker').hidden = true;
@@ -1390,9 +1464,13 @@
     currentItemFormType = null;
     editingItemIndex = null;
     serviceEditorDirty = false;
+    updateServiceSaveButton();
     renderServiceItems();
     editor.style.display = 'block';
-    setTimeout(() => editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 0);
+    setTimeout(() => {
+      editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (!serviceId) { nameInput.focus(); nameInput.select(); }
+    }, 0);
   }
 
   function closeServiceEditor(force = false) {
@@ -1405,6 +1483,8 @@
     document.getElementById('btnAddToService').setAttribute('aria-pressed', 'false');
     editingService = null;
     serviceEditorDirty = false;
+    updateServiceSaveButton();
+    clearServiceDraft();
   }
 
   function renderServiceItems() {
@@ -1430,7 +1510,7 @@
             </div>
           </div>
           <div class="service-hymn-controls">
-            ${item.type !== 'hymn' ? `<button class="btn btn-secondary" onclick="window.hymnflowEditServiceItem(${index})" title="Edit">✎</button>` : ''}
+            <button class="btn btn-secondary" onclick="window.hymnflowEditServiceItem(${index})" title="${item.type === 'hymn' ? 'Edit cue notes' : 'Edit'}">✎</button>
             <button class="btn btn-secondary" onclick="window.hymnflowMoveServiceItem(${index}, -1)" ${index === 0 ? 'disabled' : ''} aria-label="Move up">↑</button>
             <button class="btn btn-secondary" onclick="window.hymnflowMoveServiceItem(${index}, 1)" ${index === editingService.items.length - 1 ? 'disabled' : ''} aria-label="Move down">↓</button>
             <button class="btn btn-remove" onclick="window.hymnflowRemoveServiceItem(${index})" aria-label="Remove">×</button>
@@ -1440,9 +1520,12 @@
     }).join('');
   }
 
+  let pickerActiveIndex = -1;
+
   function renderHymnPicker(query) {
     const list = document.getElementById('hymnPickerList');
     if (!list) return;
+    pickerActiveIndex = -1;
     const q = (query || '').toLowerCase().trim();
     const results = q
       ? hymns.filter(h =>
@@ -1455,11 +1538,12 @@
       list.innerHTML = `<div class="hymn-picker-empty">No hymns found</div>`;
       return;
     }
+    const capped = results.length > 40;
     list.innerHTML = results.slice(0, 40).map(h => {
       const num = h.metadata?.number ? `${h.metadata.number} · ` : '';
       const title = escapeHtml(typeof h.title === 'string' ? h.title : String(h.title ?? ''));
       return `<div class="hymn-picker-item" onclick="window.hymnflowPickHymn('${escapeHtml(h.id)}')">${escapeHtml(num)}${title}</div>`;
-    }).join('');
+    }).join('') + (capped ? `<div class="hymn-picker-cap">Showing 40 of ${results.length} — refine your search</div>` : '');
   }
 
   function updateAnnounceHint(text) {
@@ -1474,6 +1558,7 @@
   function showItemForm(type, existingIndex = null) {
     currentItemFormType = type;
     editingItemIndex = existingIndex;
+    itemFormTriggerId = { hymn: 'btnAddToService', scripture: 'btnAddScripture', announce: 'btnAddAnnounce', divider: 'btnAddDivider' }[type] || null;
     const existing = existingIndex !== null ? editingService.items[existingIndex] : null;
     const titleEl = document.getElementById('itemFormTitle');
     const refRow = document.getElementById('itemFormRefRow');
@@ -1486,7 +1571,14 @@
     const notesInput = document.getElementById('itemFormNotes');
     if (notesInput) notesInput.value = existing ? (existing.notes || '') : '';
     const t = (key, fb) => window.HymnFlowI18n ? window.HymnFlowI18n.getTranslation(key) : fb;
-    if (type === 'scripture') {
+    if (type === 'hymn') {
+      // Hymns are edited only for their cue notes — the hymn itself is fixed.
+      titleEl.textContent = `Cue Notes — ${existing ? itemDisplayLabel(existing) : ''}`;
+      refRow.hidden = true;
+      textRow.hidden = true;
+      addBtn.textContent = t('services.itemForm.buttons.save', 'Save');
+      setTimeout(() => notesInput?.focus(), 0);
+    } else if (type === 'scripture') {
       titleEl.textContent = existing ? t('services.itemForm.titles.editScripture', 'Edit Scripture') : t('services.itemForm.titles.addScripture', 'Add Scripture');
       refRow.hidden = false;
       refInput.placeholder = t('services.itemForm.placeholders.scriptureRef', 'Reference (e.g., Ps 23, John 3:16)');
@@ -1510,6 +1602,7 @@
       setTimeout(() => refInput.focus(), 0);
     }
     document.getElementById('hymnPicker').hidden = true;
+    document.getElementById('btnAddToService').setAttribute('aria-pressed', 'false');
     document.getElementById('itemForm').hidden = false;
   }
 
@@ -1872,31 +1965,30 @@
   window.hymnflowPickHymn = (hymnId) => {
     if (!editingService) return;
     editingService.items.push({ type: 'hymn', hymnId });
-    serviceEditorDirty = true;
+    markServiceDirty();
     renderServiceItems();
-    document.getElementById('hymnPicker').hidden = true;
     document.getElementById('hymnPickerSearch').value = '';
-    document.getElementById('btnAddToService').setAttribute('aria-pressed', 'false');
+    closeHymnPicker();
   };
   window.hymnflowMoveServiceItem = (index, direction) => {
     if (!editingService) return;
     const newIndex = index + direction;
     if (newIndex >= 0 && newIndex < editingService.items.length) {
       [editingService.items[index], editingService.items[newIndex]] = [editingService.items[newIndex], editingService.items[index]];
-      serviceEditorDirty = true;
+      markServiceDirty();
       renderServiceItems();
     }
   };
   window.hymnflowRemoveServiceItem = (index) => {
     if (!editingService) return;
     editingService.items.splice(index, 1);
-    serviceEditorDirty = true;
+    markServiceDirty();
     renderServiceItems();
   };
   window.hymnflowEditServiceItem = (index) => {
     if (!editingService) return;
     const item = editingService.items[index];
-    if (!item || item.type === 'hymn') return;
+    if (!item) return;
     showItemForm(item.type, index);
   };
 
@@ -2190,11 +2282,33 @@
       }
     };
     document.getElementById('hymnPickerSearch').oninput = (e) => renderHymnPicker(e.target.value);
-    document.getElementById('serviceName').oninput = () => { if (editingService) serviceEditorDirty = true; };
-    document.getElementById('btnHymnPickerCancel').onclick = () => {
-      document.getElementById('hymnPicker').hidden = true;
-      document.getElementById('btnAddToService').setAttribute('aria-pressed', 'false');
-    };
+    document.getElementById('serviceName').oninput = () => { if (editingService) markServiceDirty(); };
+    // Enter in the name field: save if the service has items, otherwise move on
+    // to adding the first item.
+    document.getElementById('serviceName').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || !editingService) return;
+      e.preventDefault();
+      if (editingService.items.length > 0) saveService();
+      else document.getElementById('btnAddToService').focus();
+    });
+    document.getElementById('btnHymnPickerCancel').onclick = () => closeHymnPicker();
+    // Keyboard navigation in the hymn picker: ↑/↓ move, Enter selects
+    document.getElementById('hymnPickerSearch').addEventListener('keydown', (e) => {
+      const list = document.getElementById('hymnPickerList');
+      const rows = [...list.querySelectorAll('.hymn-picker-item')];
+      if (!rows.length) return;
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        pickerActiveIndex = e.key === 'ArrowDown'
+          ? Math.min(pickerActiveIndex + 1, rows.length - 1)
+          : Math.max(pickerActiveIndex - 1, 0);
+        rows.forEach((r, i) => r.classList.toggle('active', i === pickerActiveIndex));
+        rows[pickerActiveIndex].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        (rows[pickerActiveIndex] || rows[0]).click();
+      }
+    });
     document.getElementById('btnAddScripture').onclick = () => {
       if (!editingService) return;
       showItemForm('scripture');
@@ -2227,26 +2341,25 @@
       } else if (currentItemFormType === 'divider') {
         if (!ref) { document.getElementById('itemFormRef').focus(); return; }
         newItem = { type: 'divider', label: ref };
+      } else if (currentItemFormType === 'hymn') {
+        // Cue-notes-only edit: keep the hymn, replace the notes below
+        if (editingItemIndex === null) return;
+        newItem = { ...editingService.items[editingItemIndex] };
+        delete newItem.notes;
       }
       if (!newItem) return;
       const notes = (document.getElementById('itemFormNotes')?.value || '').trim();
       if (notes) newItem.notes = notes;
       if (editingItemIndex !== null) {
         editingService.items[editingItemIndex] = newItem;
-        editingItemIndex = null;
       } else {
         editingService.items.push(newItem);
       }
-      serviceEditorDirty = true;
+      markServiceDirty();
       renderServiceItems();
-      document.getElementById('itemForm').hidden = true;
-      currentItemFormType = null;
+      closeItemForm();
     };
-    document.getElementById('btnItemFormCancel').onclick = () => {
-      document.getElementById('itemForm').hidden = true;
-      currentItemFormType = null;
-      editingItemIndex = null;
-    };
+    document.getElementById('btnItemFormCancel').onclick = () => closeItemForm();
     document.getElementById('itemFormRef').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -2304,15 +2417,28 @@
       if (dragSrcIndex === toIndex) return;
       const [moved] = editingService.items.splice(dragSrcIndex, 1);
       editingService.items.splice(toIndex, 0, moved);
-      serviceEditorDirty = true;
+      markServiceDirty();
       renderServiceItems();
     });
 
     // Keyboard shortcuts
     window.addEventListener('keydown', (e) => {
-      // Escape closes service editor (even from inside inputs)
+      // Escape closes the innermost open layer first: item form → hymn
+      // picker → service editor (even from inside inputs).
       if (e.key === 'Escape') {
+        const itemForm = document.getElementById('itemForm');
+        const picker = document.getElementById('hymnPicker');
         const editor = document.getElementById('serviceEditor');
+        if (itemForm && !itemForm.hidden) {
+          e.preventDefault();
+          closeItemForm();
+          return;
+        }
+        if (picker && !picker.hidden) {
+          e.preventDefault();
+          closeHymnPicker();
+          return;
+        }
         if (editor && editor.style.display !== 'none') {
           e.preventDefault();
           closeServiceEditor();
@@ -2683,6 +2809,7 @@
   updateServiceBanner();
   attachEvents();
   switchTab(settings.activeTab || 'library');
+  restoreServiceDraft();
   setupLanguageSelector();
   if (window.HymnFlowI18n) {
     statusEl.textContent = window.HymnFlowI18n.getTranslation('app.status.ready', { storage: 'localStorage' });

@@ -116,7 +116,6 @@
           </div>
           <input type="file" id="serviceFileInput" accept=".txt" hidden aria-label="Select service schedule text file">
         </div>
-        <div id="servicesList" class="services-list" role="list" aria-label="Saved services"></div>
         <div id="serviceEditor" class="service-editor" style="display: none;">
           <input id="serviceName" type="text" class="search-input" data-i18n-placeholder="services.namePlaceholder"
             placeholder="Service name (e.g., Sunday Morning)">
@@ -160,20 +159,7 @@
             <button id="btnCancelService" class="btn btn-secondary" data-i18n="services.buttons.cancel">Cancel</button>
           </div>
         </div>
-      </section>
-
-      <section class="section">
-        <div class="section-header">
-          <h3 data-i18n="textSlide.title">Text Slide</h3>
-          <span class="text-slide-hint" data-i18n="textSlide.hint">scripture, announcement, blank</span>
-        </div>
-        <textarea id="textSlideInput" class="text-slide-textarea" rows="3"
-          placeholder="Type any text to send to overlay&#10;(scripture, announcement, blank screen...)"></textarea>
-        <div class="text-slide-actions">
-          <button id="btnSendTextSlide" class="btn btn-add" data-i18n="textSlide.sendButton">Send to Overlay</button>
-          <button id="btnClearTextSlide" class="btn btn-secondary" data-i18n="textSlide.clearButton">Clear
-            Slide</button>
-        </div>
+        <div id="servicesList" class="services-list" role="list" aria-label="Saved services"></div>
       </section>
 
     </div>
@@ -264,6 +250,20 @@
           <button id="btnQsNext" class="btn btn-nav qs-page-btn" aria-label="Next page" disabled>&#8594;</button>
           <button id="btnQsDisplay" class="btn btn-add" data-i18n="quickScripture.displayButton">Display</button>
           <button id="btnQsClear" class="btn btn-secondary" data-i18n="quickScripture.clearButton">Clear</button>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-header">
+          <h3 data-i18n="textSlide.title">Text Slide</h3>
+          <span class="text-slide-hint" data-i18n="textSlide.hint">scripture, announcement, blank</span>
+        </div>
+        <textarea id="textSlideInput" class="text-slide-textarea" rows="3"
+          placeholder="Type any text to send to overlay&#10;(scripture, announcement, blank screen...)"></textarea>
+        <div class="text-slide-actions">
+          <button id="btnSendTextSlide" class="btn btn-add" data-i18n="textSlide.sendButton">Send to Overlay</button>
+          <button id="btnClearTextSlide" class="btn btn-secondary" data-i18n="textSlide.clearButton">Clear
+            Slide</button>
         </div>
       </section>
 

@@ -28,6 +28,7 @@ This release came out of a full-plugin review through two lenses — media pract
   ```
 
 - **Import** (Service tab → Import) is forgiving: item numbers and type prefixes are optional — bare lines resolve as **hymn** (by number/title) → **scripture reference** → **announcement**. Unknown hymns become clearly-labelled placeholders and are reported in a warning summary. Round-trips are lossless.
+- **Save where you choose** — exports (schedules and the hymn-library JSON) open a native *Save As* dialog where the browser supports it (Chrome/Edge and OBS docks on recent OBS). Where it doesn't, they land in Downloads and the status bar tells you so.
 
 ## 🎛️ Service editor overhaul
 

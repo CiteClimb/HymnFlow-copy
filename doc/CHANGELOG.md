@@ -9,6 +9,7 @@
 #### Service schedules as text files
 - 📄 **Export any service as a `.txt` schedule** (per-service ⋯ menu → Export .txt) — human-readable, hand-editable format with item numbers, `Notes:` cue lines, and multi-line announcements
 - 📥 **Import schedules** (Service tab → Import) — forgiving parser: untyped lines resolve as hymn (by number/title against your library) → scripture reference → announcement; unknown hymns become labelled placeholders with a warning summary; round-trip is lossless
+- 💾 **Save where you choose** — exports (service schedules and the hymn-library JSON) open a native Save As dialog where the browser supports it, so you pick the folder; elsewhere they fall back to the Downloads folder and the status bar says so explicitly
 
 #### Service editor
 - 🎛️ **Cue notes on hymns** — the ✎ button now works on hymn items ("verses 1, 2, 4 only")

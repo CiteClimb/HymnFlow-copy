@@ -1902,18 +1902,16 @@
   // Saves text to a user-chosen location via the native Save As dialog where
   // the browser supports it (Chromium/CEF, incl. OBS docks on recent OBS).
   // Falls back to a regular download into the Downloads folder elsewhere.
-  // Returns { saved, cancelled, method, name }.
+  // Returns { saved, cancelled, method, name, emptyFileAtPickedLocation }.
   async function saveTextFile(filename, text, mimeType = 'text/plain', extension = '.txt') {
+    let emptyFileAtPickedLocation = false;
     if (typeof window.showSaveFilePicker === 'function') {
+      let handle = null;
       try {
-        const handle = await window.showSaveFilePicker({
+        handle = await window.showSaveFilePicker({
           suggestedName: filename,
           types: [{ description: 'HymnFlow export', accept: { [mimeType]: [extension] } }],
         });
-        const writable = await handle.createWritable();
-        await writable.write(text);
-        await writable.close();
-        return { saved: true, method: 'picker', name: handle.name };
       } catch (err) {
         if (err && err.name === 'AbortError') {
           return { saved: false, cancelled: true };
@@ -1921,6 +1919,29 @@
         // Picker unavailable in this context (permissions, embedding) —
         // fall through to the classic download.
         console.warn('[Export] Save dialog unavailable, falling back to download:', err);
+      }
+      if (handle) {
+        try {
+          const writable = await handle.createWritable();
+          await writable.write(new Blob([text], { type: mimeType }));
+          await writable.close();
+          // Some embedded browsers (OBS docks among them) show the dialog and
+          // create the file but never commit the bytes, leaving a 0-byte
+          // file. Read it back before trusting the save.
+          let committed = true;
+          try {
+            const onDisk = await handle.getFile();
+            committed = onDisk.size > 0 || text.length === 0;
+          } catch (verifyErr) { /* can't verify — assume the write landed */ }
+          if (committed) {
+            return { saved: true, method: 'picker', name: handle.name };
+          }
+          console.warn('[Export] Save dialog committed 0 bytes — falling back to download');
+          emptyFileAtPickedLocation = true;
+        } catch (err) {
+          console.warn('[Export] Save dialog write failed, falling back to download:', err);
+          emptyFileAtPickedLocation = true;
+        }
       }
     }
     const blob = new Blob([text], { type: mimeType });
@@ -1930,7 +1951,17 @@
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    return { saved: true, method: 'download', name: filename };
+    return { saved: true, method: 'download', name: filename, emptyFileAtPickedLocation };
+  }
+
+  // One consistent status line for both export paths.
+  function exportStatusMessage(result) {
+    if (result.cancelled) return 'Export cancelled';
+    if (result.method === 'picker') return `Saved ${result.name}`;
+    if (result.emptyFileAtPickedLocation) {
+      return `This browser couldn't write to your chosen location (the file there is empty) — exported ${result.name} to your Downloads folder instead`;
+    }
+    return `Exported ${result.name} to your Downloads folder`;
   }
 
   async function exportServiceTxt(serviceId) {
@@ -1939,13 +1970,7 @@
     const slug = (service.name || 'service').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'service';
     const filename = `hymnflow-service-${slug}.txt`;
     const result = await saveTextFile(filename, serviceToText(service));
-    if (result.cancelled) {
-      statusEl.textContent = 'Export cancelled';
-    } else if (result.method === 'picker') {
-      statusEl.textContent = `Saved ${result.name}`;
-    } else {
-      statusEl.textContent = `Exported ${result.name} to your Downloads folder`;
-    }
+    statusEl.textContent = exportStatusMessage(result);
   }
 
   // Finds a hymn from "234 - Amazing Grace", "234" or "Amazing Grace".
@@ -2792,17 +2817,7 @@
   async function handleExport() {
     const result = await saveTextFile('hymnflow-export.json',
       JSON.stringify(hymns, null, 2), 'application/json', '.json');
-    if (result.cancelled) {
-      statusEl.textContent = 'Export cancelled';
-      return;
-    }
-    if (result.method === 'picker') {
-      statusEl.textContent = `Saved ${result.name}`;
-    } else if (window.HymnFlowI18n) {
-      statusEl.textContent = window.HymnFlowI18n.getTranslation('hymns.status.exported', { filename: result.name });
-    } else {
-      statusEl.textContent = `Exported ${result.name}`;
-    }
+    statusEl.textContent = exportStatusMessage(result);
   }
 
   function applySettingsUI() {

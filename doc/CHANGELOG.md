@@ -1,3 +1,43 @@
+## [2.8.0] - 2026-07-05
+
+### Live-Operation Reliability, Service Workflow Overhaul & Schedule Files
+
+**Focus**: The controls can no longer misrepresent what's on the projector, the service editor renders as designed (a CSS bug had every inline panel permanently open), schedules travel as plain text files, and the dock talks back — hints, warnings, and connection alerts at the moments an operator needs them.
+
+### Added
+
+#### Service schedules as text files
+- 📄 **Export any service as a `.txt` schedule** (per-service ⋯ menu → Export .txt) — human-readable, hand-editable format with item numbers, `Notes:` cue lines, and multi-line announcements
+- 📥 **Import schedules** (Service tab → Import) — forgiving parser: untyped lines resolve as hymn (by number/title against your library) → scripture reference → announcement; unknown hymns become labelled placeholders with a warning summary; round-trip is lossless
+
+#### Service editor
+- 🎛️ **Cue notes on hymns** — the ✎ button now works on hymn items ("verses 1, 2, 4 only")
+- 💾 **Draft autosave** — every edit snapshots to sessionStorage; a dock reload (OBS scene change, crash, F5) restores the editor exactly where you were
+- 🟡 **Unsaved-changes indicator** on the Save button
+- ⌨️ **Keyboard flow** — Escape closes the innermost layer first (item form → picker → editor); hymn picker gets ↑/↓/Enter navigation and a result-cap notice; Enter in the name field saves
+- 🗂️ **Decluttered service rows** — Load / Edit / ⋯ (Duplicate, Export .txt, Delete); editor opens above the list; new services prefill a dated name
+
+#### Live operation
+- ⬛ **Blank Screen button** beside Emergency Clear — takes the output down without losing your place
+- 📖 **Auto-display planned scripture** (opt-in, Scripture Display panel) — rehearsed services skip the confidence-preview click
+- 🔔 **OBS hotkey connection alerts** — drops announced once with retry count; reconnection confirmed
+- 💡 **Operator hints** — "Display is OFF" when selecting a hymn with the switch down; "Chorus next" and "shrinks to fit" in the verse info; status bar pulses on every message
+- 1️⃣ **Lines per display** can now go down to 1; Text Slide panel is collapsible (moved to the Live tab)
+
+### Fixed
+
+- 🚨 **Display toggle could sit ON over an empty screen** — with nothing selected it now snaps back OFF and says why
+- 🚨 **Overlay hide→show race** — a hide followed within 600ms by the next push blanked the fresh content (stale timer); any show now cancels the pending hide. With animation "none", hide is instant
+- 🧱 **Service editor inline panels never hid** — `.item-inline-panel`'s `display:flex` overrode the `hidden` attribute, so the Add Hymn picker and Add Item form were both permanently visible; a `[hidden]` counter-rule restores the intended flow
+- 🧹 **Dividers now clear the screen** — advancing to "— SERMON —" hides both overlay channels instead of leaving the last verse up
+- 🌍 **i18n fallback** — `getTranslation` now always falls back to English, fixing raw keys leaking into the UI and the console warning flood
+- 🔎 **Single-digit hymn search** — typing "5" finds hymn 5 exactly instead of nothing
+
+### Technical
+- Highlight regex built once per render; FONT_ALLOWLIST sync documented in both files; obs-websocket password storage documented in SECURITY.md
+
+---
+
 ## [2.7.0] - 2026-07-03
 
 ### Scripture Lookup Reliability, Display Customization & Curated Translations
